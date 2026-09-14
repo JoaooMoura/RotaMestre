@@ -4,7 +4,7 @@
 
 ## 🌀 Protótipo Navegável
 **:link: Clique no link abaixo para visualizar o Protótipo Navegável do projeto:**  
-> [Protótipo Navegável](https://www.figma.com/make/sKKY8iVereo5EtrZqYh6mO/Naveg%C3%A1vel-Or%C3%A7amento-F%C3%A1cil?fullscreen=1&t=8A0SOIvtsIsHBaED-1)
+> [Protótipo Navegável](https://www.figma.com/make/1VkbUL3B6XL8jct0X9eRHj/Read-the-prompt?fullscreen=1&t=TtKunWDrsCcNMzIX-1&code-node-id=0-6)
 
 <br>
 
