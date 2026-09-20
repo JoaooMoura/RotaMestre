@@ -1,0 +1,12 @@
+{
+  "name": "rotamestre-backend",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "node --no-warnings=ExperimentalWarning src/server.js",
+    "test": "node --no-warnings=ExperimentalWarning --test"
+  },
+  "engines": {
+    "node": ">=22.13.0"
+  }
+}

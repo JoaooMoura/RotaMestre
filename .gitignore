@@ -65,6 +65,10 @@ yarn-error.log
 
 # testing
 /coverage
+/tmp
+/backend/data/*.sqlite
+/backend/data/*.sqlite-shm
+/backend/data/*.sqlite-wal
 
 # Yarn
 .yarn/*
