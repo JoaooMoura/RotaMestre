@@ -8,9 +8,10 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import {MaterialDesignIcons} from '@react-native-vector-icons/material-design-icons';
 import MaskInput, {Masks} from 'react-native-mask-input';
 import {Botao, Cabecalho} from '../componentes';
-import {estilos} from '../estilos';
+import {cores, estilos} from '../estilos';
 import {cadastrarMotorista} from '../servicos/api';
 import {useSessao} from '../viewmodels/SessaoViewModel';
 
@@ -38,6 +39,8 @@ export function TelaAutenticacao() {
   const [placa, setPlaca] = useState('');
   const [modelo, setModelo] = useState('');
   const [ano, setAno] = useState('');
+  const [senhaVisivel, setSenhaVisivel] = useState(false);
+  const [campoEmFoco, setCampoEmFoco] = useState<'email' | 'senha' | null>(null);
 
   useEffect(() => {
     const temporizador = setTimeout(() => setEtapa('login'), 900);
@@ -256,38 +259,121 @@ export function TelaAutenticacao() {
   }
 
   return (
-    <ScrollView style={estilos.tela} contentContainerStyle={estilos.conteudo}>
-      <StatusBar barStyle="dark-content" />
-      <View style={estilos.marcaContainer}>
-        <View style={estilos.logo}>
-          <Text style={estilos.logoTexto}>RM</Text>
+    <ScrollView
+      style={estilos.loginRolagem}
+      contentContainerStyle={estilos.loginRolagemConteudo}
+      keyboardShouldPersistTaps="handled">
+      <StatusBar barStyle="light-content" />
+      <View style={estilos.loginFaixa}>
+        <View style={estilos.loginMarcaLinha}>
+          <MaterialDesignIcons name="map-marker-path" size={32} color="#FFFFFF" />
+          <Text style={estilos.loginMarca} accessibilityRole="header">
+            RotaMestre
+          </Text>
         </View>
-        <Text style={estilos.marca}>
-          <Text style={estilos.marcaAzul}>Rota</Text>Mestre
-        </Text>
+        <Text style={estilos.loginSlogan}>Sua rota do dia, entrega a entrega.</Text>
       </View>
-      <View style={estilos.card}>
-        <Text style={estilos.titulo}>Acessar conta</Text>
-        <Text style={estilos.rotulo}>E-mail</Text>
-        <TextInput
-          style={estilos.input}
-          value={email}
-          onChangeText={setEmail}
-          keyboardType="email-address"
-          autoCapitalize="none"
-        />
-        <Text style={estilos.rotulo}>Senha</Text>
-        <TextInput style={estilos.input} value={senha} onChangeText={setSenha} secureTextEntry />
-        {sessao.erro ? <Text style={estilos.erroFormulario}>{sessao.erro}</Text> : null}
-        <Botao
-          titulo={sessao.verificando ? 'Entrando...' : 'Entrar'}
-          desabilitado={sessao.verificando}
+
+      <View style={estilos.loginFolha}>
+        <Text style={estilos.loginTitulo} accessibilityRole="header">
+          Entrar
+        </Text>
+        <Text style={estilos.loginApoio}>Use o e-mail e a senha da sua conta.</Text>
+
+        <Text style={estilos.loginRotulo}>E-mail</Text>
+        <View style={[estilos.loginCampo, campoEmFoco === 'email' && estilos.loginCampoFocado]}>
+          <MaterialDesignIcons
+            name="email-outline"
+            size={24}
+            color={campoEmFoco === 'email' ? cores.primaria : cores.textoApoio}
+          />
+          <TextInput
+            style={[estilos.loginCampoTexto, estilos.loginCampoTextoSemAcao]}
+            value={email}
+            onChangeText={setEmail}
+            onFocus={() => setCampoEmFoco('email')}
+            onBlur={() => setCampoEmFoco(null)}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            autoComplete="email"
+            accessibilityLabel="E-mail"
+          />
+        </View>
+
+        <Text style={estilos.loginRotulo}>Senha</Text>
+        <View style={[estilos.loginCampo, campoEmFoco === 'senha' && estilos.loginCampoFocado]}>
+          <MaterialDesignIcons
+            name="lock-outline"
+            size={24}
+            color={campoEmFoco === 'senha' ? cores.primaria : cores.textoApoio}
+          />
+          <TextInput
+            style={estilos.loginCampoTexto}
+            value={senha}
+            onChangeText={setSenha}
+            onFocus={() => setCampoEmFoco('senha')}
+            onBlur={() => setCampoEmFoco(null)}
+            secureTextEntry={!senhaVisivel}
+            autoCapitalize="none"
+            autoComplete="password"
+            accessibilityLabel="Senha"
+          />
+          <Pressable
+            style={estilos.loginAcaoCampo}
+            onPress={() => setSenhaVisivel(visivel => !visivel)}
+            accessibilityRole="button"
+            accessibilityLabel={senhaVisivel ? 'Ocultar senha' : 'Mostrar senha'}>
+            <MaterialDesignIcons
+              name={senhaVisivel ? 'eye-off-outline' : 'eye-outline'}
+              size={24}
+              color={cores.textoApoio}
+            />
+          </Pressable>
+        </View>
+
+        {sessao.erro ? (
+          <View style={estilos.loginErro} accessibilityLiveRegion="polite">
+            <MaterialDesignIcons name="alert-circle-outline" size={20} color={cores.erro} />
+            <Text style={estilos.loginErroTexto}>{sessao.erro}</Text>
+          </View>
+        ) : null}
+
+        <Pressable
+          accessibilityRole="button"
+          disabled={sessao.verificando}
           onPress={continuarLogin}
-        />
-        <Pressable onPress={() => setEtapa('recuperar')}>
-          <Text style={estilos.link}>Esqueci minha senha</Text>
+          style={({pressed}) => [
+            estilos.loginBotao,
+            pressed && estilos.loginBotaoPressionado,
+            sessao.verificando && estilos.botaoDesabilitado,
+          ]}>
+          <Text style={estilos.loginBotaoTexto}>
+            {sessao.verificando ? 'Entrando...' : 'Entrar'}
+          </Text>
         </Pressable>
-        <Botao titulo="Criar conta de motorista" secundario onPress={() => setEtapa('cadastro1')} />
+        <Pressable
+          style={estilos.loginLink}
+          onPress={() => setEtapa('recuperar')}
+          accessibilityRole="button">
+          <Text style={estilos.loginLinkTexto}>Esqueci minha senha</Text>
+        </Pressable>
+
+        <View style={estilos.loginEspacador} />
+
+        <View style={estilos.loginDivisor}>
+          <View style={estilos.loginDivisorLinha} />
+          <Text style={estilos.loginDivisorTexto}>Novo por aqui?</Text>
+          <View style={estilos.loginDivisorLinha} />
+        </View>
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => setEtapa('cadastro1')}
+          style={({pressed}) => [
+            estilos.loginBotaoContornado,
+            pressed && estilos.loginBotaoContornadoPressionado,
+          ]}>
+          <Text style={estilos.loginBotaoContornadoTexto}>Criar conta de motorista</Text>
+        </Pressable>
       </View>
     </ScrollView>
   );
