@@ -21,7 +21,8 @@ DerivedData
 *.ipa
 *.xcuserstate
 **/.xcode.env.local
-
+CLAUDE.md
+.claude/
 # Android/IntelliJ
 #
 build/

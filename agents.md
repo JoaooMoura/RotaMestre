@@ -13,7 +13,7 @@ Sempre utilize a menção `@agents.md` acompanhada do comando do agente correspo
 - **Contexto explícito:** cada agente declara, ao final, quais arquivos (`@arquivo.js`) o próximo agente precisa receber.
 - **Escopo travado:** nenhum agente resolve problemas fora do pedido. Bug ou débito técnico não relacionado vai em seção separada ("Observações fora de escopo").
 - **Pare em ambiguidade:** no máximo 1-2 perguntas objetivas antes de prosseguir.
-- **Idioma:** respostas em português; variáveis, commits e código em inglês.
+- **Idioma:** respostas, código, variáveis e commits em português, seguindo o padrão já usado no projeto.
 - **Arquitetura obrigatória:** MVVM + injeção de dependências em todo código novo, tanto no backend Node.js quanto no frontend RN — é um requisito não funcional explícito do projeto, não uma sugestão de estilo.
 - **Offline-first é regra, não exceção:** qualquer feature que envolva dados (rotas, entregas, telemetria) precisa considerar o cenário de conectividade intermitente desde o design, não como adição posterior.
 - **Handoff explícito:** cada agente termina indicando o próximo comando (ex: "Próximo passo: rode `/planejar` com este prompt").
