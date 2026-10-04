@@ -23,6 +23,23 @@ function textoValido(valor) {
   return typeof valor === 'string' && valor.trim().length > 0;
 }
 
+const ASSINATURA_MAX_BYTES = 512 * 1024;
+
+function comprovanteValido(comprovante, status) {
+  if (!comprovante || !textoValido(comprovante.recebedor)) {
+    return false;
+  }
+  if (comprovante.assinatura === undefined) {
+    return true;
+  }
+  return (
+    status === 'Concluída' &&
+    typeof comprovante.assinatura === 'string' &&
+    comprovante.assinatura.startsWith('data:image/png;base64,') &&
+    comprovante.assinatura.length <= ASSINATURA_MAX_BYTES
+  );
+}
+
 function validarRota(rota) {
   if (
     !rota ||
@@ -52,6 +69,13 @@ function validarRota(rota) {
       !STATUS_PARADA.has(parada.status)
     ) {
       return 'Existe uma parada inválida ou duplicada na rota.';
+    }
+
+    if (
+      parada.comprovante !== undefined &&
+      !comprovanteValido(parada.comprovante, parada.status)
+    ) {
+      return 'Comprovante de entrega inválido.';
     }
 
     ids.add(parada.id);

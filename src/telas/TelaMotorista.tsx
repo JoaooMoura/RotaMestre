@@ -1,6 +1,7 @@
 import React, {useState} from 'react';
 import {
   Alert,
+  Image,
   Pressable,
   ScrollView,
   StatusBar,
@@ -11,8 +12,8 @@ import {
 import {Abas, Badge, Botao, Cabecalho, CardParada} from '../componentes';
 import {notificacoesIniciais} from '../dados';
 import {cores, estilos} from '../estilos';
-import {Parada, Rota, StatusParada, TipoParada} from '../tipos';
-import SignatureScreen from 'react-native-signature-canvas';
+import {Comprovante, Parada, Rota, StatusParada, TipoParada} from '../tipos';
+import SignatureScreen, {SignatureViewRef} from 'react-native-signature-canvas';
 
 type Aba = 'Hoje' | 'Minha rota' | 'Notificações' | 'Perfil';
 type Fluxo =
@@ -47,7 +48,8 @@ export function TelaMotorista({rota, onAtualizarRota, onSair}: Props) {
   const [nomeRecebedor, setNomeRecebedor] = useState('');
   const [assinatura, setAssinatura] = useState('');
   const [foto, setFoto] = useState(false);
-  const signatureRef = React.useRef<any>(null);
+  const [rolagemAtiva, setRolagemAtiva] = useState(true);
+  const signatureRef = React.useRef<SignatureViewRef>(null);
 
   const paradaSelecionada =
     rota.paradas.find(item => item.id === paradaId) ?? rota.paradas[0];
@@ -58,9 +60,13 @@ export function TelaMotorista({rota, onAtualizarRota, onSair}: Props) {
     return onAtualizarRota({...rota, status});
   }
 
-  function atualizarParada(status: StatusParada) {
+  function atualizarParada(status: StatusParada, comprovante?: Comprovante) {
     const paradas = rota.paradas.map(item =>
-      item.id === paradaSelecionada?.id ? {...item, status} : item,
+      item.id === paradaSelecionada?.id
+        ? comprovante
+          ? {...item, status, comprovante}
+          : {...item, status}
+        : item,
     );
     const todasConcluidas = paradas.every(
       item => item.status === 'Concluída' || item.status === 'Não realizada',
@@ -292,21 +298,23 @@ export function TelaMotorista({rota, onAtualizarRota, onSair}: Props) {
 
   if (fluxo === 'assinatura') {
     return (
-      <ScrollView style={estilos.tela}>
+      <ScrollView style={estilos.tela} scrollEnabled={rolagemAtiva}>
         <Cabecalho titulo="Assinatura do recebedor" onVoltar={() => setFluxo('status')} />
         <View style={estilos.conteudo}>
           <Text style={estilos.rotulo}>Nome do recebedor</Text>
           <TextInput style={estilos.input} value={nomeRecebedor} onChangeText={setNomeRecebedor} />
           {assinatura ? (
-            <View style={{height: 200, backgroundColor: '#f0f0f0', justifyContent: 'center', alignItems: 'center', marginBottom: 16}}>
-              <Text>Assinatura salva com sucesso (Base64)</Text>
+            <View style={estilos.assinaturaCanvas}>
+              <Image source={{uri: assinatura}} style={estilos.assinaturaPreview} />
             </View>
           ) : (
-            <View style={{height: 200, marginBottom: 16}}>
+            <View style={estilos.assinaturaCanvas}>
               <SignatureScreen
                 ref={signatureRef}
                 onOK={(sig) => setAssinatura(sig)}
                 onEmpty={() => Alert.alert('Aviso', 'Por favor, assine antes de confirmar.')}
+                onBegin={() => setRolagemAtiva(false)}
+                onEnd={() => setRolagemAtiva(true)}
                 descriptionText="Assine aqui"
                 clearText="Limpar"
                 confirmText="Salvar"
@@ -350,7 +358,8 @@ export function TelaMotorista({rota, onAtualizarRota, onSair}: Props) {
             titulo="Confirmar entrega"
             desabilitado={!foto}
             onPress={async () => {
-              if (await atualizarParada('Concluída')) {
+              const comprovante = {recebedor: nomeRecebedor.trim(), assinatura};
+              if (await atualizarParada('Concluída', comprovante)) {
                 setFluxo('concluida');
               }
             }}
@@ -374,7 +383,7 @@ export function TelaMotorista({rota, onAtualizarRota, onSair}: Props) {
           <Botao
             titulo="Ir para próxima parada"
             onPress={() => {
-              setAssinatura(false);
+              setAssinatura('');
               setFoto(false);
               setNomeRecebedor('');
               setFluxo('ativa');

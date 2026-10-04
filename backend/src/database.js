@@ -81,7 +81,35 @@ function criarRepositorio(caminhoBanco) {
       PRIMARY KEY (id, rota_id),
       FOREIGN KEY (rota_id) REFERENCES rotas(id) ON DELETE CASCADE
     );
+
+    CREATE TABLE IF NOT EXISTS comprovantes (
+      rota_id TEXT NOT NULL,
+      parada_id TEXT NOT NULL,
+      recebedor TEXT NOT NULL,
+      assinatura TEXT NOT NULL,
+      registrado_em INTEGER NOT NULL,
+      PRIMARY KEY (rota_id, parada_id),
+      FOREIGN KEY (rota_id) REFERENCES rotas(id) ON DELETE CASCADE
+    );
   `);
+
+  function listarParadas(rotaId) {
+    return banco
+      .prepare(`
+        SELECT p.id, p.tipo, p.destinatario, p.endereco, p.janela, p.observacao, p.status,
+               c.recebedor, c.registrado_em
+        FROM paradas p
+        LEFT JOIN comprovantes c ON c.rota_id = p.rota_id AND c.parada_id = p.id
+        WHERE p.rota_id = ?
+        ORDER BY p.ordem
+      `)
+      .all(rotaId)
+      .map(({recebedor, registrado_em, ...parada}) =>
+        recebedor
+          ? {...parada, comprovante: {recebedor, registradoEm: registrado_em}}
+          : parada,
+      );
+  }
 
   function salvarMotorista(motorista) {
     banco
@@ -134,14 +162,7 @@ function criarRepositorio(caminhoBanco) {
       return null;
     }
 
-    const paradas = banco
-      .prepare(`
-        SELECT id, tipo, destinatario, endereco, janela, observacao, status
-        FROM paradas
-        WHERE rota_id = ?
-        ORDER BY ordem
-      `)
-      .all(rota.id);
+    const paradas = listarParadas(rota.id);
 
     return {
       id: rota.id,
@@ -185,6 +206,14 @@ function criarRepositorio(caminhoBanco) {
           id, rota_id, ordem, tipo, destinatario, endereco, janela, observacao, status
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
+      const salvarComprovante = banco.prepare(`
+        INSERT INTO comprovantes (rota_id, parada_id, recebedor, assinatura, registrado_em)
+        VALUES (?, ?, ?, ?, ?)
+        ON CONFLICT(rota_id, parada_id) DO UPDATE SET
+          recebedor = excluded.recebedor,
+          assinatura = excluded.assinatura,
+          registrado_em = excluded.registrado_em
+      `);
 
       rota.paradas.forEach((parada, ordem) => {
         inserirParada.run(
@@ -198,6 +227,16 @@ function criarRepositorio(caminhoBanco) {
           parada.observacao,
           parada.status,
         );
+
+        if (parada.comprovante?.assinatura) {
+          salvarComprovante.run(
+            rota.id,
+            parada.id,
+            parada.comprovante.recebedor.trim(),
+            parada.comprovante.assinatura,
+            Date.now(),
+          );
+        }
       });
 
       banco.exec('COMMIT');
@@ -221,14 +260,7 @@ function criarRepositorio(caminhoBanco) {
       return null;
     }
 
-    const paradas = banco
-      .prepare(`
-        SELECT id, tipo, destinatario, endereco, janela, observacao, status
-        FROM paradas
-        WHERE rota_id = ?
-        ORDER BY ordem
-      `)
-      .all(id);
+    const paradas = listarParadas(id);
 
     return {
       id: rota.id,

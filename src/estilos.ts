@@ -237,6 +237,17 @@ export const estilos = StyleSheet.create({
     marginVertical: 14,
   },
   assinaturaTexto: {color: cores.texto, fontSize: 28, fontStyle: 'italic'},
+  assinaturaCanvas: {
+    height: 190,
+    borderWidth: 2,
+    borderStyle: 'dashed',
+    borderColor: '#94A3B8',
+    borderRadius: 16,
+    backgroundColor: '#FFFFFF',
+    overflow: 'hidden',
+    marginVertical: 14,
+  },
+  assinaturaPreview: {width: '100%', height: '100%', resizeMode: 'contain'},
   foto: {
     height: 190,
     borderRadius: 16,

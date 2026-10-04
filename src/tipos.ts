@@ -21,6 +21,13 @@ export type Motorista = {
   disponivel: boolean;
 };
 
+export type Comprovante = {
+  recebedor: string;
+  // Data URI PNG, enviado apenas no salvamento que conclui a entrega.
+  assinatura?: string;
+  registradoEm?: number;
+};
+
 export type Parada = {
   id: string;
   tipo: TipoParada;
@@ -29,6 +36,7 @@ export type Parada = {
   janela: string;
   observacao: string;
   status: StatusParada;
+  comprovante?: Comprovante;
 };
 
 export type Rota = {
