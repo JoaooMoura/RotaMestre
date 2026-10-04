@@ -12,7 +12,7 @@ import MaskInput, {Masks} from 'react-native-mask-input';
 import {Botao, Cabecalho} from '../componentes';
 import {estilos} from '../estilos';
 import {cadastrarMotorista} from '../servicos/api';
-import {Perfil} from '../tipos';
+import {useSessao} from '../viewmodels/SessaoViewModel';
 
 type Etapa =
   | 'splash'
@@ -24,15 +24,11 @@ type Etapa =
   | 'cadastro3'
   | 'concluido';
 
-type Props = {
-  onEntrar: (perfil: Perfil, email: string) => void;
-};
-
-export function TelaAutenticacao({onEntrar}: Props) {
+export function TelaAutenticacao() {
+  const sessao = useSessao();
   const [etapa, setEtapa] = useState<Etapa>('splash');
-  const [perfil, setPerfil] = useState<Perfil>('motorista');
-  const [email, setEmail] = useState('motorista@rotamestre.com');
-  const [senha, setSenha] = useState('123456');
+  const [email, setEmail] = useState('');
+  const [senha, setSenha] = useState('');
   const [codigo, setCodigo] = useState('');
   const [nome, setNome] = useState('');
   const [telefone, setTelefone] = useState('');
@@ -48,20 +44,17 @@ export function TelaAutenticacao({onEntrar}: Props) {
     return () => clearTimeout(temporizador);
   }, []);
 
-  function continuarLogin() {
-    if (!email.trim() || !senha.trim()) {
-      Alert.alert('Dados obrigatórios', 'Informe o e-mail e a senha.');
-      return;
+  async function continuarLogin() {
+    if (await sessao.verificarCredenciais(email, senha)) {
+      setCodigo('');
+      setEtapa('codigo');
     }
-    setEtapa('codigo');
   }
 
   function confirmarCodigo() {
-    if (codigo.length !== 6) {
+    if (!sessao.confirmarCodigo(codigo)) {
       Alert.alert('Código inválido', 'Digite os seis números recebidos.');
-      return;
     }
-    onEntrar(perfil, email.trim());
   }
 
   if (etapa === 'splash') {
@@ -275,20 +268,6 @@ export function TelaAutenticacao({onEntrar}: Props) {
       </View>
       <View style={estilos.card}>
         <Text style={estilos.titulo}>Acessar conta</Text>
-        <Text style={estilos.rotulo}>Perfil da demonstração</Text>
-        <View style={estilos.linha}>
-          <Pressable
-            style={[estilos.opcao, estilos.flex, perfil === 'motorista' && estilos.opcaoAtiva]}
-            onPress={() => setPerfil('motorista')}>
-            <Text style={estilos.opcaoTexto}>Motorista</Text>
-          </Pressable>
-          <View style={estilos.espacadorHorizontal} />
-          <Pressable
-            style={[estilos.opcao, estilos.flex, perfil === 'gestor' && estilos.opcaoAtiva]}
-            onPress={() => setPerfil('gestor')}>
-            <Text style={estilos.opcaoTexto}>Gestor</Text>
-          </Pressable>
-        </View>
         <Text style={estilos.rotulo}>E-mail</Text>
         <TextInput
           style={estilos.input}
@@ -299,7 +278,12 @@ export function TelaAutenticacao({onEntrar}: Props) {
         />
         <Text style={estilos.rotulo}>Senha</Text>
         <TextInput style={estilos.input} value={senha} onChangeText={setSenha} secureTextEntry />
-        <Botao titulo="Entrar" onPress={continuarLogin} />
+        {sessao.erro ? <Text style={estilos.erroFormulario}>{sessao.erro}</Text> : null}
+        <Botao
+          titulo={sessao.verificando ? 'Entrando...' : 'Entrar'}
+          desabilitado={sessao.verificando}
+          onPress={continuarLogin}
+        />
         <Pressable onPress={() => setEtapa('recuperar')}>
           <Text style={estilos.link}>Esqueci minha senha</Text>
         </Pressable>

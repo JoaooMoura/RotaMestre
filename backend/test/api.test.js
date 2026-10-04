@@ -8,8 +8,28 @@ const {DatabaseSync} = require('node:sqlite');
 const {criarRepositorio} = require('../src/database');
 
 const pastaTemporaria = fs.mkdtempSync(path.join(os.tmpdir(), 'rotamestre-'));
-const aplicacao = criarServidor(path.join(pastaTemporaria, 'teste.sqlite'));
+const SEGREDO_TESTE = 'segredo-de-teste-com-pelo-menos-32-caracteres';
+const aplicacao = criarServidor({
+  caminhoBanco: path.join(pastaTemporaria, 'teste.sqlite'),
+  segredoJwt: SEGREDO_TESTE,
+  seedDemo: true,
+});
 let endereco;
+let tokenGestor;
+let tokenMotorista;
+
+async function entrar(email, senha = '123') {
+  return fetch(`${endereco}/api/auth/login`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({email, senha}),
+  });
+}
+
+// Por padrão os testes agem como o gestor de demonstração.
+function cabecalhos(token = tokenGestor) {
+  return {'Content-Type': 'application/json', Authorization: `Bearer ${token}`};
+}
 
 // Campos de CNH e telefone exigidos pelo cadastro (US02.01).
 const DADOS_CNH = {
@@ -23,6 +43,8 @@ before(async () => {
   await new Promise(resolve => aplicacao.servidor.listen(0, '127.0.0.1', resolve));
   const dados = aplicacao.servidor.address();
   endereco = `http://127.0.0.1:${dados.port}`;
+  tokenGestor = (await (await entrar('gestor@rotamestre.com')).json()).token;
+  tokenMotorista = (await (await entrar('motorista@rotamestre.com')).json()).token;
 });
 
 after(async () => {
@@ -69,13 +91,13 @@ test('persiste uma rota atribuída com suas paradas', async () => {
 
   const salvamento = await fetch(`${endereco}/api/rotas/${rota.id}`, {
     method: 'PUT',
-    headers: {'Content-Type': 'application/json'},
+    headers: cabecalhos(),
     body: JSON.stringify(rota),
   });
 
   assert.equal(salvamento.status, 200);
 
-  const consulta = await fetch(`${endereco}/api/rotas/atual?motoristaId=1`);
+  const consulta = await fetch(`${endereco}/api/rotas/atual?motoristaId=1`, {headers: cabecalhos()});
   assert.equal(consulta.status, 200);
   assert.deepEqual(await consulta.json(), rota);
 });
@@ -83,7 +105,7 @@ test('persiste uma rota atribuída com suas paradas', async () => {
 test('recusa uma rota sem duas paradas', async () => {
   const resposta = await fetch(`${endereco}/api/rotas/RT-INVALIDA`, {
     method: 'PUT',
-    headers: {'Content-Type': 'application/json'},
+    headers: cabecalhos(),
     body: JSON.stringify({
       id: 'RT-INVALIDA',
       nome: 'Inválida',
@@ -133,7 +155,7 @@ function rotaComAssinatura(assinatura) {
 function salvarRotaTeste(rota) {
   return fetch(`${endereco}/api/rotas/${rota.id}`, {
     method: 'PUT',
-    headers: {'Content-Type': 'application/json'},
+    headers: cabecalhos(),
     body: JSON.stringify(rota),
   });
 }
@@ -141,7 +163,7 @@ function salvarRotaTeste(rota) {
 test('persiste o comprovante assinado sem reenviar a imagem nos salvamentos seguintes', async () => {
   await fetch(`${endereco}/api/motoristas`, {
     method: 'POST',
-    headers: {'Content-Type': 'application/json'},
+    headers: cabecalhos(),
     body: JSON.stringify({
       id: 'M-ASS',
       nome: 'Motorista Assinatura',
@@ -168,7 +190,7 @@ test('persiste o comprovante assinado sem reenviar a imagem nos salvamentos segu
   assert.equal(salva.paradas[0].comprovante.assinatura, undefined);
   assert.equal(salva.paradas[1].comprovante, undefined);
 
-  const consulta = await fetch(`${endereco}/api/rotas/atual?motoristaId=M-ASS`);
+  const consulta = await fetch(`${endereco}/api/rotas/atual?motoristaId=M-ASS`, {headers: cabecalhos()});
   const rotaConsultada = await consulta.json();
   assert.equal(rotaConsultada.paradas[0].comprovante.recebedor, 'Maria');
 });
@@ -315,7 +337,7 @@ test('reabrir um banco já migrado não falha', () => {
 test('nenhum endpoint de motoristas devolve a senha, nem com hash', async () => {
   const cadastro = await fetch(`${endereco}/api/motoristas`, {
     method: 'POST',
-    headers: {'Content-Type': 'application/json'},
+    headers: cabecalhos(),
     body: JSON.stringify({
       id: 'M-SENHA',
       nome: 'Motorista Senha',
@@ -328,7 +350,7 @@ test('nenhum endpoint de motoristas devolve a senha, nem com hash', async () => 
   assert.equal(cadastro.status, 201);
   assert.equal('senha' in (await cadastro.json()), false);
 
-  const lista = await (await fetch(`${endereco}/api/motoristas`)).json();
+  const lista = await (await fetch(`${endereco}/api/motoristas`, {headers: cabecalhos()})).json();
   assert.ok(lista.length > 0);
   assert.ok(lista.every(motorista => !('senha' in motorista)));
 });
@@ -336,7 +358,7 @@ test('nenhum endpoint de motoristas devolve a senha, nem com hash', async () => 
 async function cadastrarMotoristaTeste(id) {
   const resposta = await fetch(`${endereco}/api/motoristas`, {
     method: 'POST',
-    headers: {'Content-Type': 'application/json'},
+    headers: cabecalhos(),
     body: JSON.stringify({
       id,
       nome: `Motorista ${id}`,
@@ -365,7 +387,7 @@ function rotaSimples(id, motoristaId, status = 'Programada') {
 }
 
 async function rotaAtualDe(motoristaId) {
-  return fetch(`${endereco}/api/rotas/atual?motoristaId=${motoristaId}`);
+  return fetch(`${endereco}/api/rotas/atual?motoristaId=${motoristaId}`, {headers: cabecalhos()});
 }
 
 test('a rota atual é a do motorista pedido, não a mais recente de outro', async () => {
@@ -394,7 +416,7 @@ test('motorista sem rota recebe 404', async () => {
 function cadastrarMotoristaCom(dados) {
   return fetch(`${endereco}/api/motoristas`, {
     method: 'POST',
-    headers: {'Content-Type': 'application/json'},
+    headers: cabecalhos(),
     body: JSON.stringify({
       nome: 'Motorista CNH',
       senha: '123',
@@ -451,7 +473,7 @@ test('cadastro recusa CNH, categoria, validade ou telefone inválidos', async ()
 
 test('a lista de motoristas não expõe CNH nem telefone', async () => {
   await cadastrarMotoristaCom({id: 'M-PRIVADO', email: 'privado@teste.com'});
-  const lista = await (await fetch(`${endereco}/api/motoristas`)).json();
+  const lista = await (await fetch(`${endereco}/api/motoristas`, {headers: cabecalhos()})).json();
 
   for (const motorista of lista) {
     for (const campo of ['telefone', 'cnhNumero', 'cnh_numero', 'cnhCategoria', 'cnhValidade']) {
@@ -506,7 +528,7 @@ test('o e-mail é gravado normalizado', async () => {
 function enviarCorpoBruto(metodo, caminho, corpo) {
   return fetch(`${endereco}${caminho}`, {
     method: metodo,
-    headers: {'Content-Type': 'application/json'},
+    headers: cabecalhos(),
     body: corpo,
   });
 }
@@ -530,5 +552,224 @@ test('JSON válido que não é objeto responde 400', async () => {
     assert.deepEqual(await resposta.json(), {
       mensagem: 'O corpo da requisição deve ser um objeto JSON.',
     });
+  }
+});
+
+// ---------- Autenticação e papéis (B2) ----------
+
+const jwt = require('jsonwebtoken');
+
+test('login do gestor devolve token e usuário com papel, sem senha', async () => {
+  const resposta = await entrar('  GESTOR@rotamestre.com ');
+  assert.equal(resposta.status, 200);
+
+  const {token, usuario} = await resposta.json();
+  assert.equal(typeof token, 'string');
+  assert.deepEqual(usuario, {
+    id: 'G-1',
+    nome: 'Rodrigo Matos (Demo)',
+    email: 'gestor@rotamestre.com',
+    papel: 'gestor',
+  });
+  assert.equal(jwt.verify(token, SEGREDO_TESTE).sub, 'G-1');
+});
+
+test('senha errada e e-mail inexistente recebem a mesma resposta 401', async () => {
+  const senhaErrada = await entrar('gestor@rotamestre.com', 'errada');
+  const semConta = await entrar('ninguem@rotamestre.com', '123');
+
+  for (const resposta of [senhaErrada, semConta]) {
+    assert.equal(resposta.status, 401);
+    assert.deepEqual(await resposta.json(), {mensagem: 'E-mail ou senha incorretos.'});
+  }
+});
+
+test('login sem e-mail ou senha responde 400', async () => {
+  const resposta = await entrar('gestor@rotamestre.com', '');
+  assert.equal(resposta.status, 400);
+});
+
+test('endpoints protegidos exigem token válido', async () => {
+  const semToken = await fetch(`${endereco}/api/rotas/atual`);
+  assert.equal(semToken.status, 401);
+  assert.deepEqual(await semToken.json(), {mensagem: 'Autenticação necessária.'});
+
+  const tokenAlheio = jwt.sign({papel: 'gestor'}, 'outro-segredo-com-pelo-menos-32-caracteres', {
+    subject: 'G-1',
+  });
+  const falsificado = await fetch(`${endereco}/api/motoristas`, {headers: cabecalhos(tokenAlheio)});
+  assert.equal(falsificado.status, 401);
+
+  const vencido = jwt.sign({papel: 'gestor'}, SEGREDO_TESTE, {subject: 'G-1', expiresIn: -10});
+  const expirado = await fetch(`${endereco}/api/motoristas`, {headers: cabecalhos(vencido)});
+  assert.equal(expirado.status, 401);
+  assert.deepEqual(await expirado.json(), {mensagem: 'Sessão expirada. Entre novamente.'});
+
+  const usuarioInexistente = jwt.sign({papel: 'gestor'}, SEGREDO_TESTE, {subject: 'NAO-EXISTE'});
+  const fantasma = await fetch(`${endereco}/api/motoristas`, {headers: cabecalhos(usuarioInexistente)});
+  assert.equal(fantasma.status, 401);
+});
+
+test('o papel vem do banco, não do token: motorista com papel "gestor" no token é barrado', async () => {
+  const forjado = jwt.sign({papel: 'gestor'}, SEGREDO_TESTE, {subject: '1'});
+  const resposta = await fetch(`${endereco}/api/motoristas`, {headers: cabecalhos(forjado)});
+  assert.equal(resposta.status, 403);
+});
+
+test('motorista não acessa a lista de motoristas', async () => {
+  const resposta = await fetch(`${endereco}/api/motoristas`, {headers: cabecalhos(tokenMotorista)});
+  assert.equal(resposta.status, 403);
+  assert.deepEqual(await resposta.json(), {mensagem: 'Acesso não permitido para este perfil.'});
+});
+
+test('motorista recebe a própria rota e o parâmetro motoristaId é ignorado', async () => {
+  await cadastrarMotoristaTeste('M-OUTRO');
+  assert.equal((await salvarRotaTeste(rotaSimples('RT-DO-OUTRO', 'M-OUTRO', 'Em andamento'))).status, 200);
+
+  const resposta = await fetch(`${endereco}/api/rotas/atual?motoristaId=M-OUTRO`, {
+    headers: cabecalhos(tokenMotorista),
+  });
+  assert.equal(resposta.status, 200);
+  assert.equal((await resposta.json()).motoristaId, '1');
+});
+
+test('motorista só altera a própria rota, sem reatribuir nem criar rotas', async () => {
+  const comoMotorista = rota =>
+    fetch(`${endereco}/api/rotas/${rota.id}`, {
+      method: 'PUT',
+      headers: cabecalhos(tokenMotorista),
+      body: JSON.stringify(rota),
+    });
+
+  const rotaAlheia = rotaSimples('RT-DO-OUTRO', 'M-OUTRO', 'Em andamento');
+  assert.equal((await comoMotorista(rotaAlheia)).status, 403);
+
+  const tomarRota = {...rotaAlheia, motoristaId: '1'};
+  assert.equal((await comoMotorista(tomarRota)).status, 403);
+
+  assert.equal((await comoMotorista(rotaSimples('RT-NOVA-DO-MOTORISTA', '1'))).status, 403);
+
+  const propria = rotaSimples('RT-PROPRIA', '1');
+  assert.equal((await salvarRotaTeste(propria)).status, 200);
+  const reatribuir = await comoMotorista({...propria, motoristaId: 'M-OUTRO'});
+  assert.equal(reatribuir.status, 403);
+  assert.deepEqual(await reatribuir.json(), {mensagem: 'Motorista só pode alterar a própria rota.'});
+
+  const iniciar = await comoMotorista({...propria, status: 'Em andamento'});
+  assert.equal(iniciar.status, 200);
+  assert.equal((await iniciar.json()).status, 'Em andamento');
+});
+
+test('cadastro público sempre cria motorista, mesmo enviando papel "gestor"', async () => {
+  const cadastro = await cadastrarMotoristaCom({
+    id: 'M-ESPERTO',
+    email: 'esperto@teste.com',
+    papel: 'gestor',
+  });
+  assert.equal(cadastro.status, 201);
+  assert.equal('papel' in (await cadastro.json()), false);
+
+  const {usuario} = await (await entrar('esperto@teste.com')).json();
+  assert.equal(usuario.papel, 'motorista');
+});
+
+test('motorista recém-cadastrado consegue entrar com a própria senha', async () => {
+  await cadastrarMotoristaCom({id: 'M-NOVO', email: 'novo@teste.com', senha: 'minha-senha'});
+
+  assert.equal((await entrar('novo@teste.com', 'minha-senha')).status, 200);
+  assert.equal((await entrar('novo@teste.com', '123')).status, 401);
+});
+
+test('servidor não sobe sem segredo JWT ou com segredo curto', () => {
+  const caminhoBanco = path.join(pastaTemporaria, 'sem-segredo.sqlite');
+  assert.throws(() => criarServidor({caminhoBanco}), /JWT_SECRET/);
+  assert.throws(() => criarServidor({caminhoBanco, segredoJwt: 'curto'}), /JWT_SECRET/);
+});
+
+test('sem seedDemo nenhuma conta com senha conhecida é criada', () => {
+  const caminho = path.join(pastaTemporaria, 'sem-demo.sqlite');
+  criarRepositorio(caminho).fechar();
+
+  const banco = new DatabaseSync(caminho);
+  const total = banco.prepare('SELECT count(*) AS n FROM usuarios').get().n;
+  banco.close();
+  assert.equal(total, 0);
+});
+
+test('migra banco antigo: credenciais vão para usuarios, rotas continuam válidas e há backup', async () => {
+  const bcrypt = require('bcryptjs');
+  const caminho = path.join(pastaTemporaria, 'antes-de-usuarios.sqlite');
+  const antigo = new DatabaseSync(caminho);
+  antigo.exec(`
+    CREATE TABLE motoristas (
+      id TEXT PRIMARY KEY, nome TEXT NOT NULL, email TEXT UNIQUE, senha TEXT,
+      veiculo TEXT NOT NULL, disponivel INTEGER NOT NULL DEFAULT 1
+    );
+    CREATE TABLE rotas (
+      id TEXT PRIMARY KEY, nome TEXT NOT NULL, data TEXT NOT NULL, horario TEXT NOT NULL,
+      motorista_id TEXT NOT NULL, status TEXT NOT NULL, criado_em INTEGER NOT NULL,
+      FOREIGN KEY (motorista_id) REFERENCES motoristas(id)
+    );
+  `);
+  antigo
+    .prepare('INSERT INTO motoristas VALUES (?, ?, ?, ?, ?, 1)')
+    .run('M-ANTIGO', 'Antigo', 'Antigo@Teste.com', bcrypt.hashSync('senha-antiga', 4), 'Van');
+  antigo
+    .prepare('INSERT INTO rotas VALUES (?, ?, ?, ?, ?, ?, ?)')
+    .run('RT-ANTIGA', 'R', 'Hoje', '08:00', 'M-ANTIGO', 'Programada', 1);
+  antigo.close();
+
+  const repositorio = criarRepositorio(caminho);
+  assert.deepEqual(repositorio.buscarUsuario('M-ANTIGO'), {
+    id: 'M-ANTIGO',
+    nome: 'Antigo',
+    email: 'antigo@teste.com',
+    papel: 'motorista',
+  });
+  assert.equal(repositorio.buscarRotaAtual('M-ANTIGO').id, 'RT-ANTIGA');
+  assert.deepEqual(repositorio.listarMotoristas().map(m => m.id), ['M-ANTIGO']);
+
+  const {criarServicoAutenticacao} = require('../src/autenticacao');
+  const servico = criarServicoAutenticacao({repositorio, segredo: SEGREDO_TESTE});
+  assert.ok(await servico.entrar('antigo@teste.com', 'senha-antiga'));
+  repositorio.fechar();
+
+  const migrado = new DatabaseSync(caminho);
+  const colunas = migrado.prepare('PRAGMA table_info(motoristas)').all().map(c => c.name);
+  const violacoes = migrado.prepare('PRAGMA foreign_key_check').all();
+  migrado.close();
+  assert.equal(colunas.includes('email'), false);
+  assert.equal(colunas.includes('senha'), false);
+  assert.deepEqual(violacoes, []);
+  assert.ok(fs.existsSync(`${caminho}.antes-usuarios.bak`));
+});
+
+test('servidor não sobe com JWT_VALIDADE inválido, zero ou negativo', () => {
+  const caminhoBanco = path.join(pastaTemporaria, 'validade-invalida.sqlite');
+  for (const validadeToken of ['12 horas', 'abc', '0s', '-1h']) {
+    assert.throws(
+      () => criarServidor({caminhoBanco, segredoJwt: SEGREDO_TESTE, validadeToken}),
+      /JWT_VALIDADE inválido/,
+      validadeToken,
+    );
+  }
+  assert.equal(fs.existsSync(caminhoBanco), false);
+});
+
+test('JWT_VALIDADE válido em texto ou em segundos é aceito', () => {
+  const {validarValidadeToken} = require('../src/autenticacao');
+  for (const validade of ['12h', '30m', '1d', 3600]) {
+    assert.doesNotThrow(() => validarValidadeToken(validade), String(validade));
+  }
+});
+
+test('token assinado sem sub responde 401, não 500', async () => {
+  const semSub = jwt.sign({papel: 'gestor'}, SEGREDO_TESTE);
+  const subNumerico = jwt.sign({sub: 1, papel: 'gestor'}, SEGREDO_TESTE);
+
+  for (const token of [semSub, subNumerico]) {
+    const resposta = await fetch(`${endereco}/api/motoristas`, {headers: cabecalhos(token)});
+    assert.equal(resposta.status, 401);
+    assert.deepEqual(await resposta.json(), {mensagem: 'Autenticação inválida.'});
   }
 });

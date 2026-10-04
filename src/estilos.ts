@@ -208,6 +208,13 @@ export const estilos = StyleSheet.create({
   logoTexto: {color: '#FFFFFF', fontSize: 27, fontWeight: '900'},
   marca: {color: cores.texto, fontSize: 34, fontWeight: '900'},
   marcaAzul: {color: cores.primaria},
+  erroFormulario: {
+    color: cores.perigo,
+    fontSize: 14,
+    fontWeight: '700',
+    marginTop: 10,
+    textAlign: 'center',
+  },
   link: {
     color: cores.primaria,
     fontSize: 14,

@@ -1,4 +1,17 @@
-export type Perfil = 'gestor' | 'motorista';
+// Papel definido pelo backend (tabela usuarios); o app nunca escolhe o papel.
+export type Papel = 'gestor' | 'motorista';
+
+export type Usuario = {
+  id: string;
+  nome: string;
+  email: string;
+  papel: Papel;
+};
+
+export type Sessao = {
+  token: string;
+  usuario: Usuario;
+};
 
 export type TipoParada = 'Coleta' | 'Entrega';
 

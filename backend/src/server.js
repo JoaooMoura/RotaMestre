@@ -3,6 +3,11 @@ const path = require('node:path');
 const {Buffer} = require('node:buffer');
 const {URL} = require('node:url');
 const bcrypt = require('bcryptjs');
+const {
+  criarServicoAutenticacao,
+  validarSegredoJwt,
+  validarValidadeToken,
+} = require('./autenticacao');
 const {criarRepositorio} = require('./database');
 
 const TIPOS_PARADA = new Set(['Coleta', 'Entrega']);
@@ -144,8 +149,8 @@ function validarRota(rota) {
 
 function responder(resposta, status, corpo) {
   resposta.writeHead(status, {
-    'Access-Control-Allow-Headers': 'Content-Type',
-    'Access-Control-Allow-Methods': 'GET, PUT, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, OPTIONS',
     'Access-Control-Allow-Origin': '*',
     'Content-Type': 'application/json; charset=utf-8',
   });
@@ -199,8 +204,29 @@ function lerJson(requisicao) {
   });
 }
 
-function criarServidor(caminhoBanco) {
-  const repositorio = criarRepositorio(caminhoBanco);
+function criarServidor({caminhoBanco, segredoJwt, validadeToken = '12h', seedDemo = false}) {
+  // Antes de abrir o banco: uma configuração inválida não pode deixar o arquivo aberto.
+  validarSegredoJwt(segredoJwt);
+  validarValidadeToken(validadeToken);
+  const repositorio = criarRepositorio(caminhoBanco, {seedDemo});
+  const autenticacao = criarServicoAutenticacao({
+    repositorio,
+    segredo: segredoJwt,
+    validade: validadeToken,
+  });
+
+  // Devolve o usuário do token ou lança 401 (sem token/inválido) ou 403 (papel não autorizado).
+  function exigirUsuario(requisicao, papeisPermitidos) {
+    const {usuario, erro} = autenticacao.verificar(requisicao.headers.authorization);
+    if (erro) {
+      throw erroHttp(401, erro);
+    }
+    if (papeisPermitidos && !papeisPermitidos.includes(usuario.papel)) {
+      throw erroHttp(403, 'Acesso não permitido para este perfil.');
+    }
+    return usuario;
+  }
+
   const servidor = http.createServer(async (requisicao, resposta) => {
     if (requisicao.method === 'OPTIONS') {
       responder(resposta, 204, {});
@@ -215,6 +241,22 @@ function criarServidor(caminhoBanco) {
         return;
       }
 
+      if (requisicao.method === 'POST' && url.pathname === '/api/auth/login') {
+        const {email, senha} = await lerJson(requisicao);
+        if (!textoValido(email) || !textoValido(senha)) {
+          responder(resposta, 400, {mensagem: 'Informe e-mail e senha.'});
+          return;
+        }
+        const sessao = await autenticacao.entrar(email, senha);
+        if (!sessao) {
+          responder(resposta, 401, {mensagem: 'E-mail ou senha incorretos.'});
+          return;
+        }
+        responder(resposta, 200, sessao);
+        return;
+      }
+
+      // Cadastro público: sempre cria papel 'motorista', qualquer papel enviado é ignorado.
       if (requisicao.method === 'POST' && url.pathname === '/api/motoristas') {
         const {erro: erroCadastro, motorista} = validarCadastroMotorista(await lerJson(requisicao));
         if (erroCadastro) {
@@ -235,14 +277,19 @@ function criarServidor(caminhoBanco) {
       }
 
       if (requisicao.method === 'GET' && url.pathname === '/api/motoristas') {
+        exigirUsuario(requisicao, ['gestor']);
         responder(resposta, 200, repositorio.listarMotoristas());
         return;
       }
 
       if (requisicao.method === 'GET' && url.pathname === '/api/rotas/atual') {
-        const rota = repositorio.buscarRotaAtual(
-          url.searchParams.get('motoristaId') || undefined,
-        );
+        const usuario = exigirUsuario(requisicao);
+        // O motorista só vê a própria rota; o filtro por parâmetro vale apenas para o gestor.
+        const motoristaId =
+          usuario.papel === 'motorista'
+            ? usuario.id
+            : url.searchParams.get('motoristaId') || undefined;
+        const rota = repositorio.buscarRotaAtual(motoristaId);
 
         if (!rota) {
           responder(resposta, 404, {mensagem: 'Nenhuma rota encontrada.'});
@@ -256,6 +303,7 @@ function criarServidor(caminhoBanco) {
       const rotaEncontrada = url.pathname.match(/^\/api\/rotas\/([^/]+)$/);
 
       if (requisicao.method === 'PUT' && rotaEncontrada) {
+        const usuario = exigirUsuario(requisicao);
         const rota = await lerJson(requisicao);
         rota.id = decodeURIComponent(rotaEncontrada[1]);
         const erroValidacao = validarRota(rota);
@@ -263,6 +311,17 @@ function criarServidor(caminhoBanco) {
         if (erroValidacao) {
           responder(resposta, 400, {mensagem: erroValidacao});
           return;
+        }
+
+        // O motorista só altera a rota já atribuída a ele e não pode criar nem reatribuir rotas.
+        if (usuario.papel === 'motorista') {
+          const existente = repositorio.buscarRota(rota.id);
+          if (
+            existente?.motoristaId !== usuario.id ||
+            rota.motoristaId !== usuario.id
+          ) {
+            throw erroHttp(403, 'Motorista só pode alterar a própria rota.');
+          }
         }
 
         const salva = repositorio.salvarRota(rota);
@@ -290,7 +349,28 @@ if (require.main === module) {
   const caminhoBanco =
     process.env.ROTAMESTRE_DB_PATH ||
     path.join(__dirname, '..', 'data', 'rotamestre.sqlite');
-  const aplicacao = criarServidor(caminhoBanco);
+
+  // Sem segredo não há como assinar tokens com segurança: o servidor não sobe com um padrão.
+  if (!process.env.JWT_SECRET) {
+    process.stderr.write(
+      'JWT_SECRET não definido. Copie backend/.env.example para backend/.env e preencha.\n',
+    );
+    process.exit(1);
+  }
+
+  let aplicacao;
+  try {
+    aplicacao = criarServidor({
+      caminhoBanco,
+      segredoJwt: process.env.JWT_SECRET,
+      validadeToken: process.env.JWT_VALIDADE || '12h',
+      seedDemo: process.env.ROTAMESTRE_SEED_DEMO === '1',
+    });
+  } catch (falha) {
+    // Configuração inválida: mensagem direta em vez do stack trace.
+    process.stderr.write(`Não foi possível iniciar a API: ${falha.message}\n`);
+    process.exit(1);
+  }
 
   aplicacao.servidor.listen(porta, '0.0.0.0', () => {
     process.stdout.write(`API RotaMestre disponível na porta ${porta}\n`);

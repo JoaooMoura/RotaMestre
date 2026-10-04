@@ -42,27 +42,71 @@ const ROTA_INICIAL = {
   ],
 };
 
+// Contas criadas apenas com a opção seedDemo (ROTAMESTRE_SEED_DEMO=1).
+const SENHA_DEMO = '123';
+const GESTOR_DEMO = {
+  id: 'G-1',
+  nome: 'Rodrigo Matos (Demo)',
+  email: 'gestor@rotamestre.com',
+  papel: 'gestor',
+};
+const MOTORISTA_DEMO = {
+  id: '1',
+  nome: 'Carlos Mendes (Demo)',
+  email: 'motorista@rotamestre.com',
+  veiculo: 'Mercedes-Benz Sprinter • ABC-1234',
+  disponivel: true,
+};
+
 // Código do SQLite para violação de UNIQUE (SQLITE_CONSTRAINT_UNIQUE).
 const SQLITE_CONSTRAINT_UNIQUE = 2067;
 
-function criarRepositorio(caminhoBanco) {
-  fs.mkdirSync(path.dirname(caminhoBanco), {recursive: true});
-  const banco = new DatabaseSync(caminhoBanco);
-
-  banco.exec('PRAGMA foreign_keys = ON');
-  banco.exec(`
-    CREATE TABLE IF NOT EXISTS motoristas (
+function ddlMotoristas(nomeTabela) {
+  return `
+    CREATE TABLE IF NOT EXISTS ${nomeTabela} (
       id TEXT PRIMARY KEY,
-      nome TEXT NOT NULL,
-      email TEXT UNIQUE,
-      senha TEXT,
       veiculo TEXT NOT NULL,
       disponivel INTEGER NOT NULL DEFAULT 1,
       telefone TEXT,
       cnh_numero TEXT,
       cnh_categoria TEXT,
-      cnh_validade TEXT
+      cnh_validade TEXT,
+      FOREIGN KEY (id) REFERENCES usuarios(id) ON DELETE CASCADE
     );
+  `;
+}
+
+function criarRepositorio(caminhoBanco, {seedDemo = false} = {}) {
+  fs.mkdirSync(path.dirname(caminhoBanco), {recursive: true});
+  const banco = new DatabaseSync(caminhoBanco);
+
+  function tabelaTemColuna(tabela, coluna) {
+    return banco
+      .prepare(`PRAGMA table_info(${tabela})`)
+      .all()
+      .some(item => item.name === coluna);
+  }
+
+  // Antes de usuarios, e-mail e senha ficavam em motoristas.
+  const bancoLegado = tabelaTemColuna('motoristas', 'email');
+  if (bancoLegado) {
+    const backup = `${caminhoBanco}.antes-usuarios.bak`;
+    if (!fs.existsSync(backup)) {
+      banco.exec(`VACUUM INTO '${backup.replace(/'/g, "''")}'`);
+    }
+  }
+
+  banco.exec('PRAGMA foreign_keys = ON');
+  banco.exec(`
+    CREATE TABLE IF NOT EXISTS usuarios (
+      id TEXT PRIMARY KEY,
+      nome TEXT NOT NULL,
+      email TEXT NOT NULL UNIQUE,
+      senha TEXT,
+      papel TEXT NOT NULL CHECK (papel IN ('gestor', 'motorista'))
+    );
+
+    ${ddlMotoristas('motoristas')}
 
     CREATE TABLE IF NOT EXISTS rotas (
       id TEXT PRIMARY KEY,
@@ -103,8 +147,7 @@ function criarRepositorio(caminhoBanco) {
 
   // Bancos criados antes de cada mudança de schema já têm as tabelas, mas sem as colunas novas.
   function adicionarColunaSeFaltar(tabela, coluna) {
-    const colunas = banco.prepare(`PRAGMA table_info(${tabela})`).all();
-    if (!colunas.some(item => item.name === coluna)) {
+    if (!tabelaTemColuna(tabela, coluna)) {
       banco.exec(`ALTER TABLE ${tabela} ADD COLUMN ${coluna} TEXT`);
     }
   }
@@ -113,6 +156,48 @@ function criarRepositorio(caminhoBanco) {
   ['telefone', 'cnh_numero', 'cnh_categoria', 'cnh_validade'].forEach(coluna =>
     adicionarColunaSeFaltar('motoristas', coluna), // US02.01
   );
+
+  // Move e-mail e senha de motoristas para usuarios (papel 'motorista') e reconstrói motoristas
+  // sem essas colunas. O SQLite não remove coluna UNIQUE com DROP COLUMN, por isso a reconstrução.
+  function migrarParaUsuarios() {
+    banco.exec('PRAGMA foreign_keys = OFF');
+    banco.exec('BEGIN IMMEDIATE');
+    try {
+      banco.exec(`
+        INSERT INTO usuarios (id, nome, email, senha, papel)
+        SELECT id, nome,
+               COALESCE(lower(trim(email)), 'sem-email+' || id || '@rotamestre.invalid'),
+               senha, 'motorista'
+        FROM motoristas;
+
+        ${ddlMotoristas('motoristas_nova')}
+
+        INSERT INTO motoristas_nova (
+          id, veiculo, disponivel, telefone, cnh_numero, cnh_categoria, cnh_validade
+        )
+        SELECT id, veiculo, disponivel, telefone, cnh_numero, cnh_categoria, cnh_validade
+        FROM motoristas;
+
+        DROP TABLE motoristas;
+        ALTER TABLE motoristas_nova RENAME TO motoristas;
+      `);
+
+      const violacoes = banco.prepare('PRAGMA foreign_key_check').all();
+      if (violacoes.length > 0) {
+        throw new Error(`Migração para usuarios deixaria ${violacoes.length} referência(s) inválida(s).`);
+      }
+      banco.exec('COMMIT');
+    } catch (erro) {
+      banco.exec('ROLLBACK');
+      throw erro;
+    } finally {
+      banco.exec('PRAGMA foreign_keys = ON');
+    }
+  }
+
+  if (bancoLegado) {
+    migrarParaUsuarios();
+  }
 
   function listarParadas(rotaId) {
     return banco
@@ -132,20 +217,34 @@ function criarRepositorio(caminhoBanco) {
       );
   }
 
-  function salvarMotorista(motorista) {
+  function inserirUsuario(usuario) {
     try {
+      banco
+        .prepare('INSERT INTO usuarios (id, nome, email, senha, papel) VALUES (?, ?, ?, ?, ?)')
+        .run(usuario.id, usuario.nome, usuario.email, usuario.senha, usuario.papel);
+    } catch (erro) {
+      if (erro.errcode === SQLITE_CONSTRAINT_UNIQUE && erro.message.includes('usuarios.email')) {
+        const duplicado = new Error('Este e-mail já está cadastrado.');
+        duplicado.codigo = 'EMAIL_DUPLICADO';
+        throw duplicado;
+      }
+      throw erro;
+    }
+  }
+
+  // Cria o usuário (papel sempre 'motorista') e o perfil de motorista na mesma transação.
+  function salvarMotorista(motorista) {
+    banco.exec('BEGIN IMMEDIATE');
+    try {
+      inserirUsuario({...motorista, papel: 'motorista'});
       banco
         .prepare(`
           INSERT INTO motoristas (
-            id, nome, email, senha, veiculo, disponivel,
-            telefone, cnh_numero, cnh_categoria, cnh_validade
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            id, veiculo, disponivel, telefone, cnh_numero, cnh_categoria, cnh_validade
+          ) VALUES (?, ?, ?, ?, ?, ?, ?)
         `)
         .run(
           motorista.id,
-          motorista.nome,
-          motorista.email,
-          motorista.senha,
           motorista.veiculo,
           motorista.disponivel ? 1 : 0,
           motorista.telefone ?? null,
@@ -153,27 +252,54 @@ function criarRepositorio(caminhoBanco) {
           motorista.cnhCategoria ?? null,
           motorista.cnhValidade ?? null,
         );
+      banco.exec('COMMIT');
     } catch (erro) {
-      if (erro.errcode === SQLITE_CONSTRAINT_UNIQUE && erro.message.includes('motoristas.email')) {
-        const duplicado = new Error('Este e-mail já está cadastrado.');
-        duplicado.codigo = 'EMAIL_DUPLICADO';
-        throw duplicado;
-      }
+      banco.exec('ROLLBACK');
       throw erro;
     }
-    // A senha (mesmo com hash) nunca sai do repositório.
-    const {senha, ...motoristaSemSenha} = motorista;
-    return motoristaSemSenha;
+
+    // Campos explícitos: a senha (mesmo com hash) nunca sai do repositório.
+    return {
+      id: motorista.id,
+      nome: motorista.nome,
+      email: motorista.email,
+      veiculo: motorista.veiculo,
+      disponivel: Boolean(motorista.disponivel),
+      telefone: motorista.telefone,
+      cnhNumero: motorista.cnhNumero,
+      cnhCategoria: motorista.cnhCategoria,
+      cnhValidade: motorista.cnhValidade,
+    };
   }
 
   function listarMotoristas() {
     return banco
-      .prepare('SELECT id, nome, email, veiculo, disponivel FROM motoristas ORDER BY nome')
+      .prepare(`
+        SELECT m.id, u.nome, u.email, m.veiculo, m.disponivel
+        FROM motoristas m
+        JOIN usuarios u ON u.id = m.id
+        ORDER BY u.nome
+      `)
       .all()
       .map(motorista => ({
         ...motorista,
         disponivel: Boolean(motorista.disponivel),
       }));
+  }
+
+  // Uso exclusivo da autenticação: é a única consulta que devolve o hash da senha.
+  function buscarCredenciais(email) {
+    const usuario = banco
+      .prepare('SELECT id, nome, email, senha, papel FROM usuarios WHERE email = ?')
+      .get(email);
+    return usuario ? {...usuario} : null;
+  }
+
+  function buscarUsuario(id) {
+    const usuario = banco
+      .prepare('SELECT id, nome, email, papel FROM usuarios WHERE id = ?')
+      .get(id);
+    return usuario ? {...usuario} : null;
   }
 
   // Rota em execução tem prioridade sobre uma programada mais nova; concluídas ficam por último.
@@ -322,21 +448,32 @@ function criarRepositorio(caminhoBanco) {
     };
   }
 
-  if (!buscarRotaAtual()) {
+  // Cada conta e a rota de exemplo são criadas só se ainda não existirem, inclusive em bancos migrados.
+  function garantirDadosDemo() {
     const bcrypt = require('bcryptjs');
-    salvarMotorista({
-      id: '1',
-      nome: 'Carlos Mendes (Demo)',
-      email: 'motorista@rotamestre.com',
-      senha: bcrypt.hashSync('123', 10),
-      veiculo: 'Mercedes-Benz Sprinter • ABC-1234',
-      disponivel: true,
-    });
-    salvarRota(ROTA_INICIAL);
+    let hashDemo;
+    const senhaDemo = () => (hashDemo ??= bcrypt.hashSync(SENHA_DEMO, 10));
+
+    if (!buscarCredenciais(GESTOR_DEMO.email)) {
+      inserirUsuario({...GESTOR_DEMO, senha: senhaDemo()});
+    }
+    if (!buscarCredenciais(MOTORISTA_DEMO.email)) {
+      salvarMotorista({...MOTORISTA_DEMO, senha: senhaDemo()});
+    }
+    if (!buscarRotaAtual()) {
+      salvarRota(ROTA_INICIAL);
+    }
+  }
+
+  if (seedDemo) {
+    garantirDadosDemo();
   }
 
   return {
+    buscarCredenciais,
+    buscarRota: buscarRotaAtualPorId,
     buscarRotaAtual,
+    buscarUsuario,
     listarMotoristas,
     salvarMotorista,
     salvarRota,

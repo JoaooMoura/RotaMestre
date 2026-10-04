@@ -77,3 +77,8 @@ yarn-error.log
 !.yarn/releases
 !.yarn/sdks
 !.yarn/versions
+
+# Segredos locais do backend (JWT_SECRET etc.)
+backend/.env
+# Backups automáticos criados pelas migrações do banco
+/backend/data/*.bak

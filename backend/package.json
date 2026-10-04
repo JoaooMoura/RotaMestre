@@ -3,13 +3,14 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "start": "node --no-warnings=ExperimentalWarning src/server.js",
+    "start": "node --env-file-if-exists=.env --no-warnings=ExperimentalWarning src/server.js",
     "test": "node --no-warnings=ExperimentalWarning --test"
   },
   "engines": {
     "node": ">=22.13.0"
   },
   "dependencies": {
-    "bcryptjs": "^3.0.3"
+    "bcryptjs": "^3.0.3",
+    "jsonwebtoken": "^9.0.3"
   }
 }

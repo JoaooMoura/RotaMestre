@@ -17,9 +17,9 @@ O protótipo atual representa a **Sprint 1 — Fundação e operação básica**
 ### ✅ O que já está prototipado
 
 - Cadastro de motorista, CNH e veículo;
-- Login com separação entre os perfis **Motorista** e **Gestor**;
-- Confirmação de acesso por código enviado por e-mail;
-- Recuperação de senha;
+- Login com e-mail e senha conferidos no servidor (bcrypt + JWT), com o papel **Motorista** ou **Gestor** definido pelo backend — cada papel acessa apenas as operações autorizadas;
+- Confirmação de acesso por código enviado por e-mail (**simulada**: nenhum e-mail é enviado e qualquer código de 6 dígitos é aceito);
+- Recuperação de senha (**simulada**: apenas exibe a confirmação, sem envio de e-mail);
 - Resumo diário do motorista;
 - Central de notificações;
 - Consulta da rota e das paradas;
@@ -30,6 +30,19 @@ O protótipo atual representa a **Sprint 1 — Fundação e operação básica**
 - Coleta de assinatura do recebedor;
 - Anexo de foto do comprovante;
 - Telas de gestão da frota (criação/atribuição de rotas) dentro do próprio app.
+
+### 🔐 Executando localmente
+
+1. Copie `backend/.env.example` para `backend/.env` e preencha `JWT_SECRET` (o próprio arquivo traz o comando para gerar um segredo).
+2. Na pasta `backend/`, rode `npm install` e `npm start`.
+3. Com `ROTAMESTRE_SEED_DEMO=1`, o backend cria as contas de demonstração abaixo (senha `123`). Não habilite essa opção em servidor público.
+
+| Papel | E-mail |
+| :--- | :--- |
+| Gestor | `gestor@rotamestre.com` |
+| Motorista | `motorista@rotamestre.com` |
+
+A sessão fica apenas em memória: ao fechar o aplicativo é preciso entrar novamente (manter a sessão salva no aparelho está previsto junto com o modo offline da Sprint 2).
 
 ### 🚧 Próximas etapas
 
