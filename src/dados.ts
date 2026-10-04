@@ -4,18 +4,21 @@ export const motoristas: Motorista[] = [
   {
     id: '1',
     nome: 'Carlos Mendes',
+    email: 'motorista@rotamestre.com',
     veiculo: 'Mercedes-Benz Sprinter • ABC-1234',
     disponivel: true,
   },
   {
     id: '2',
     nome: 'Ana Paula Souza',
+    email: 'ana.souza@rotamestre.com',
     veiculo: 'Fiat Ducato • XYZ-5678',
     disponivel: true,
   },
   {
     id: '3',
     nome: 'Ricardo Ferreira',
+    email: 'ricardo.ferreira@rotamestre.com',
     veiculo: 'Ford Transit • DEF-9012',
     disponivel: true,
   },

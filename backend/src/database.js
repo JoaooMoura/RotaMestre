@@ -42,6 +42,9 @@ const ROTA_INICIAL = {
   ],
 };
 
+// Código do SQLite para violação de UNIQUE (SQLITE_CONSTRAINT_UNIQUE).
+const SQLITE_CONSTRAINT_UNIQUE = 2067;
+
 function criarRepositorio(caminhoBanco) {
   fs.mkdirSync(path.dirname(caminhoBanco), {recursive: true});
   const banco = new DatabaseSync(caminhoBanco);
@@ -54,7 +57,11 @@ function criarRepositorio(caminhoBanco) {
       email TEXT UNIQUE,
       senha TEXT,
       veiculo TEXT NOT NULL,
-      disponivel INTEGER NOT NULL DEFAULT 1
+      disponivel INTEGER NOT NULL DEFAULT 1,
+      telefone TEXT,
+      cnh_numero TEXT,
+      cnh_categoria TEXT,
+      cnh_validade TEXT
     );
 
     CREATE TABLE IF NOT EXISTS rotas (
@@ -94,11 +101,18 @@ function criarRepositorio(caminhoBanco) {
     );
   `);
 
-  // Bancos criados antes da US07.04 já têm a tabela, mas sem a coluna foto.
-  const colunasComprovante = banco.prepare('PRAGMA table_info(comprovantes)').all();
-  if (!colunasComprovante.some(coluna => coluna.name === 'foto')) {
-    banco.exec('ALTER TABLE comprovantes ADD COLUMN foto TEXT');
+  // Bancos criados antes de cada mudança de schema já têm as tabelas, mas sem as colunas novas.
+  function adicionarColunaSeFaltar(tabela, coluna) {
+    const colunas = banco.prepare(`PRAGMA table_info(${tabela})`).all();
+    if (!colunas.some(item => item.name === coluna)) {
+      banco.exec(`ALTER TABLE ${tabela} ADD COLUMN ${coluna} TEXT`);
+    }
   }
+
+  adicionarColunaSeFaltar('comprovantes', 'foto'); // US07.04
+  ['telefone', 'cnh_numero', 'cnh_categoria', 'cnh_validade'].forEach(coluna =>
+    adicionarColunaSeFaltar('motoristas', coluna), // US02.01
+  );
 
   function listarParadas(rotaId) {
     return banco
@@ -119,31 +133,59 @@ function criarRepositorio(caminhoBanco) {
   }
 
   function salvarMotorista(motorista) {
-    banco
-      .prepare(`
-        INSERT INTO motoristas (id, nome, email, senha, veiculo, disponivel)
-        VALUES (?, ?, ?, ?, ?, ?)
-      `)
-      .run(
-        motorista.id,
-        motorista.nome,
-        motorista.email,
-        motorista.senha,
-        motorista.veiculo,
-        motorista.disponivel ? 1 : 0,
-      );
-    return motorista;
+    try {
+      banco
+        .prepare(`
+          INSERT INTO motoristas (
+            id, nome, email, senha, veiculo, disponivel,
+            telefone, cnh_numero, cnh_categoria, cnh_validade
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `)
+        .run(
+          motorista.id,
+          motorista.nome,
+          motorista.email,
+          motorista.senha,
+          motorista.veiculo,
+          motorista.disponivel ? 1 : 0,
+          motorista.telefone ?? null,
+          motorista.cnhNumero ?? null,
+          motorista.cnhCategoria ?? null,
+          motorista.cnhValidade ?? null,
+        );
+    } catch (erro) {
+      if (erro.errcode === SQLITE_CONSTRAINT_UNIQUE && erro.message.includes('motoristas.email')) {
+        const duplicado = new Error('Este e-mail já está cadastrado.');
+        duplicado.codigo = 'EMAIL_DUPLICADO';
+        throw duplicado;
+      }
+      throw erro;
+    }
+    // A senha (mesmo com hash) nunca sai do repositório.
+    const {senha, ...motoristaSemSenha} = motorista;
+    return motoristaSemSenha;
   }
 
   function listarMotoristas() {
     return banco
-      .prepare('SELECT id, nome, email, senha, veiculo, disponivel FROM motoristas ORDER BY nome')
+      .prepare('SELECT id, nome, email, veiculo, disponivel FROM motoristas ORDER BY nome')
       .all()
       .map(motorista => ({
         ...motorista,
         disponivel: Boolean(motorista.disponivel),
       }));
   }
+
+  // Rota em execução tem prioridade sobre uma programada mais nova; concluídas ficam por último.
+  const ORDEM_ROTA_ATUAL = `
+    ORDER BY CASE status
+      WHEN 'Em andamento' THEN 0
+      WHEN 'Pausada' THEN 0
+      WHEN 'Programada' THEN 1
+      ELSE 2
+    END, criado_em DESC
+    LIMIT 1
+  `;
 
   function buscarRotaAtual(motoristaId) {
     const rota = motoristaId
@@ -152,16 +194,14 @@ function criarRepositorio(caminhoBanco) {
             SELECT id, nome, data, horario, motorista_id, status
             FROM rotas
             WHERE motorista_id = ?
-            ORDER BY criado_em DESC
-            LIMIT 1
+            ${ORDEM_ROTA_ATUAL}
           `)
           .get(motoristaId)
       : banco
           .prepare(`
             SELECT id, nome, data, horario, motorista_id, status
             FROM rotas
-            ORDER BY criado_em DESC
-            LIMIT 1
+            ${ORDEM_ROTA_ATUAL}
           `)
           .get();
 

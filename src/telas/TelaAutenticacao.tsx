@@ -25,7 +25,7 @@ type Etapa =
   | 'concluido';
 
 type Props = {
-  onEntrar: (perfil: Perfil) => void;
+  onEntrar: (perfil: Perfil, email: string) => void;
 };
 
 export function TelaAutenticacao({onEntrar}: Props) {
@@ -61,7 +61,7 @@ export function TelaAutenticacao({onEntrar}: Props) {
       Alert.alert('Código inválido', 'Digite os seis números recebidos.');
       return;
     }
-    onEntrar(perfil);
+    onEntrar(perfil, email.trim());
   }
 
   if (etapa === 'splash') {
@@ -246,6 +246,10 @@ export function TelaAutenticacao({onEntrar}: Props) {
                   senha,
                   veiculo: `${modelo} • ${placa}`,
                   disponivel: true,
+                  telefone,
+                  cnhNumero: cnh,
+                  cnhCategoria: categoria,
+                  cnhValidade: validade,
                 });
                 setEtapa('concluido');
               } catch (e: any) {

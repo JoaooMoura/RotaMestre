@@ -17,8 +17,18 @@ export type StatusRota =
 export type Motorista = {
   id: string;
   nome: string;
+  email: string;
   veiculo: string;
   disponivel: boolean;
+};
+
+// Dados enviados no cadastro; a senha nunca volta da API e CNH/telefone não aparecem na listagem.
+export type NovoMotorista = Motorista & {
+  senha: string;
+  telefone: string;
+  cnhNumero: string;
+  cnhCategoria: string;
+  cnhValidade: string;
 };
 
 export type Comprovante = {

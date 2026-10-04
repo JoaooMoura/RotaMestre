@@ -23,6 +23,53 @@ function textoValido(valor) {
   return typeof valor === 'string' && valor.trim().length > 0;
 }
 
+const CATEGORIAS_CNH = new Set(['A', 'B', 'C', 'D', 'E', 'AB', 'AC', 'AD', 'AE']);
+
+function somenteDigitos(valor) {
+  return typeof valor === 'string' ? valor.replace(/\D/g, '') : '';
+}
+
+// Converte DD/MM/AAAA para AAAA-MM-DD; devolve null se a data não existir (ex.: 31/02/2030).
+function dataIsoValida(valor) {
+  const partes = typeof valor === 'string' && valor.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (!partes) {
+    return null;
+  }
+  const [, dia, mes, ano] = partes;
+  const data = new Date(Date.UTC(Number(ano), Number(mes) - 1, Number(dia)));
+  const existe =
+    data.getUTCFullYear() === Number(ano) &&
+    data.getUTCMonth() === Number(mes) - 1 &&
+    data.getUTCDate() === Number(dia);
+  return existe ? `${ano}-${mes}-${dia}` : null;
+}
+
+// Valida e normaliza o cadastro; devolve {erro} ou {motorista} pronto para gravar.
+function validarCadastroMotorista(dados) {
+  if (!dados || ![dados.id, dados.nome, dados.email, dados.senha, dados.veiculo].every(textoValido)) {
+    return {erro: 'Dados obrigatórios faltando.'};
+  }
+  const telefone = somenteDigitos(dados.telefone);
+  if (telefone.length < 10 || telefone.length > 11) {
+    return {erro: 'Telefone inválido.'};
+  }
+  const cnhNumero = somenteDigitos(dados.cnhNumero);
+  if (cnhNumero.length !== 11) {
+    return {erro: 'Número da CNH deve ter 11 dígitos.'};
+  }
+  const cnhCategoria = typeof dados.cnhCategoria === 'string' ? dados.cnhCategoria.trim().toUpperCase() : '';
+  if (!CATEGORIAS_CNH.has(cnhCategoria)) {
+    return {erro: 'Categoria da CNH inválida.'};
+  }
+  const cnhValidade = dataIsoValida(dados.cnhValidade);
+  if (!cnhValidade) {
+    return {erro: 'Data de validade da CNH inválida.'};
+  }
+  // E-mail normalizado: a restrição UNIQUE do SQLite diferencia maiúsculas, o login não.
+  const email = dados.email.trim().toLowerCase();
+  return {motorista: {...dados, email, telefone, cnhNumero, cnhCategoria, cnhValidade}};
+}
+
 const ASSINATURA_MAX_BYTES = 512 * 1024;
 const FOTO_MAX_BYTES = 512 * 1024;
 const CORPO_MAX_BYTES = 2 * 1024 * 1024;
@@ -133,11 +180,19 @@ function lerJson(requisicao) {
         reject(erroHttp(413, 'Corpo da requisição excede 2 MB.'));
         return;
       }
+      let corpo;
       try {
-        resolve(JSON.parse(Buffer.concat(partes).toString('utf8')));
+        corpo = JSON.parse(Buffer.concat(partes).toString('utf8'));
       } catch {
-        reject(new Error('JSON inválido.'));
+        reject(erroHttp(400, 'JSON inválido.'));
+        return;
       }
+      // null, números e textos são JSON válido, mas todos os endpoints esperam um objeto.
+      if (corpo === null || typeof corpo !== 'object' || Array.isArray(corpo)) {
+        reject(erroHttp(400, 'O corpo da requisição deve ser um objeto JSON.'));
+        return;
+      }
+      resolve(corpo);
     });
 
     requisicao.on('error', reject);
@@ -161,14 +216,21 @@ function criarServidor(caminhoBanco) {
       }
 
       if (requisicao.method === 'POST' && url.pathname === '/api/motoristas') {
-        const motorista = await lerJson(requisicao);
-        if (!motorista.id || !motorista.nome || !motorista.email || !motorista.senha || !motorista.veiculo) {
-          responder(resposta, 400, {mensagem: 'Dados obrigatórios faltando.'});
+        const {erro: erroCadastro, motorista} = validarCadastroMotorista(await lerJson(requisicao));
+        if (erroCadastro) {
+          responder(resposta, 400, {mensagem: erroCadastro});
           return;
         }
         motorista.senha = await bcrypt.hash(motorista.senha, 10);
-        const salvo = repositorio.salvarMotorista(motorista);
-        responder(resposta, 201, salvo);
+        try {
+          responder(resposta, 201, repositorio.salvarMotorista(motorista));
+        } catch (erro) {
+          if (erro.codigo === 'EMAIL_DUPLICADO') {
+            responder(resposta, 409, {mensagem: erro.message});
+            return;
+          }
+          throw erro;
+        }
         return;
       }
 
@@ -245,4 +307,4 @@ if (require.main === module) {
   process.on('SIGTERM', encerrar);
 }
 
-module.exports = {criarServidor, validarRota};
+module.exports = {criarServidor, validarRota, validarCadastroMotorista};

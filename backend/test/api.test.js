@@ -11,6 +11,14 @@ const pastaTemporaria = fs.mkdtempSync(path.join(os.tmpdir(), 'rotamestre-'));
 const aplicacao = criarServidor(path.join(pastaTemporaria, 'teste.sqlite'));
 let endereco;
 
+// Campos de CNH e telefone exigidos pelo cadastro (US02.01).
+const DADOS_CNH = {
+  telefone: '(12) 99876-5432',
+  cnhNumero: '12345678901',
+  cnhCategoria: 'b',
+  cnhValidade: '31/12/2030',
+};
+
 before(async () => {
   await new Promise(resolve => aplicacao.servidor.listen(0, '127.0.0.1', resolve));
   const dados = aplicacao.servidor.address();
@@ -140,6 +148,7 @@ test('persiste o comprovante assinado sem reenviar a imagem nos salvamentos segu
       email: 'assinatura@teste.com',
       senha: '123',
       veiculo: 'Van',
+      ...DADOS_CNH,
     }),
   });
 
@@ -301,4 +310,225 @@ test('preserva acentos em corpos grandes divididos em vários pedaços', async (
 test('reabrir um banco já migrado não falha', () => {
   const caminho = path.join(pastaTemporaria, 'antigo.sqlite');
   assert.doesNotThrow(() => criarRepositorio(caminho).fechar());
+});
+
+test('nenhum endpoint de motoristas devolve a senha, nem com hash', async () => {
+  const cadastro = await fetch(`${endereco}/api/motoristas`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      id: 'M-SENHA',
+      nome: 'Motorista Senha',
+      email: 'senha@teste.com',
+      senha: 'segredo',
+      veiculo: 'Van',
+      ...DADOS_CNH,
+    }),
+  });
+  assert.equal(cadastro.status, 201);
+  assert.equal('senha' in (await cadastro.json()), false);
+
+  const lista = await (await fetch(`${endereco}/api/motoristas`)).json();
+  assert.ok(lista.length > 0);
+  assert.ok(lista.every(motorista => !('senha' in motorista)));
+});
+
+async function cadastrarMotoristaTeste(id) {
+  const resposta = await fetch(`${endereco}/api/motoristas`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      id,
+      nome: `Motorista ${id}`,
+      email: `${id.toLowerCase()}@teste.com`,
+      senha: '123',
+      veiculo: 'Van',
+      ...DADOS_CNH,
+    }),
+  });
+  assert.equal(resposta.status, 201);
+}
+
+function rotaSimples(id, motoristaId, status = 'Programada') {
+  return {
+    id,
+    nome: `Rota ${id}`,
+    data: 'Hoje',
+    horario: '08:00',
+    motoristaId,
+    status,
+    paradas: [
+      {id: 'P-1', tipo: 'Coleta', destinatario: 'A', endereco: 'Rua A', janela: '08:00 - 09:00', observacao: '', status: 'Pendente'},
+      {id: 'P-2', tipo: 'Entrega', destinatario: 'B', endereco: 'Rua B', janela: '09:00 - 10:00', observacao: '', status: 'Pendente'},
+    ],
+  };
+}
+
+async function rotaAtualDe(motoristaId) {
+  return fetch(`${endereco}/api/rotas/atual?motoristaId=${motoristaId}`);
+}
+
+test('a rota atual é a do motorista pedido, não a mais recente de outro', async () => {
+  await cadastrarMotoristaTeste('M-A');
+  await cadastrarMotoristaTeste('M-B');
+  assert.equal((await salvarRotaTeste(rotaSimples('RT-DE-A', 'M-A'))).status, 200);
+  assert.equal((await salvarRotaTeste(rotaSimples('RT-DE-B', 'M-B'))).status, 200);
+
+  assert.equal((await (await rotaAtualDe('M-A')).json()).id, 'RT-DE-A');
+  assert.equal((await (await rotaAtualDe('M-B')).json()).id, 'RT-DE-B');
+});
+
+test('rota em andamento tem prioridade sobre uma programada mais nova do mesmo motorista', async () => {
+  await cadastrarMotoristaTeste('M-C');
+  assert.equal((await salvarRotaTeste(rotaSimples('RT-EXECUCAO', 'M-C', 'Em andamento'))).status, 200);
+  assert.equal((await salvarRotaTeste(rotaSimples('RT-AMANHA', 'M-C', 'Programada'))).status, 200);
+
+  assert.equal((await (await rotaAtualDe('M-C')).json()).id, 'RT-EXECUCAO');
+});
+
+test('motorista sem rota recebe 404', async () => {
+  await cadastrarMotoristaTeste('M-SEM-ROTA');
+  assert.equal((await rotaAtualDe('M-SEM-ROTA')).status, 404);
+});
+
+function cadastrarMotoristaCom(dados) {
+  return fetch(`${endereco}/api/motoristas`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      nome: 'Motorista CNH',
+      senha: '123',
+      veiculo: 'Van',
+      ...DADOS_CNH,
+      ...dados,
+    }),
+  });
+}
+
+function lerMotoristaDoBanco(id) {
+  const banco = new DatabaseSync(path.join(pastaTemporaria, 'teste.sqlite'));
+  try {
+    return banco
+      .prepare('SELECT telefone, cnh_numero, cnh_categoria, cnh_validade FROM motoristas WHERE id = ?')
+      .get(id);
+  } finally {
+    banco.close();
+  }
+}
+
+test('cadastro grava CNH e telefone normalizados no banco', async () => {
+  const resposta = await cadastrarMotoristaCom({id: 'M-CNH', email: 'cnh@teste.com'});
+  assert.equal(resposta.status, 201);
+
+  assert.deepEqual({...lerMotoristaDoBanco('M-CNH')}, {
+    telefone: '12998765432',
+    cnh_numero: '12345678901',
+    cnh_categoria: 'B',
+    cnh_validade: '2030-12-31',
+  });
+});
+
+test('cadastro recusa CNH, categoria, validade ou telefone inválidos', async () => {
+  const casos = [
+    [{cnhNumero: '1234567890'}, 'Número da CNH deve ter 11 dígitos.'],
+    [{cnhCategoria: 'Z'}, 'Categoria da CNH inválida.'],
+    [{cnhValidade: '31/02/2030'}, 'Data de validade da CNH inválida.'],
+    [{cnhValidade: '2030-12-31'}, 'Data de validade da CNH inválida.'],
+    [{telefone: '9876-5432'}, 'Telefone inválido.'],
+    [{nome: '   '}, 'Dados obrigatórios faltando.'],
+  ];
+
+  for (const [indice, [dados, mensagem]] of casos.entries()) {
+    const resposta = await cadastrarMotoristaCom({
+      id: `M-INVALIDO-${indice}`,
+      email: `invalido${indice}@teste.com`,
+      ...dados,
+    });
+    assert.equal(resposta.status, 400, JSON.stringify(dados));
+    assert.deepEqual(await resposta.json(), {mensagem});
+  }
+});
+
+test('a lista de motoristas não expõe CNH nem telefone', async () => {
+  await cadastrarMotoristaCom({id: 'M-PRIVADO', email: 'privado@teste.com'});
+  const lista = await (await fetch(`${endereco}/api/motoristas`)).json();
+
+  for (const motorista of lista) {
+    for (const campo of ['telefone', 'cnhNumero', 'cnh_numero', 'cnhCategoria', 'cnhValidade']) {
+      assert.equal(campo in motorista, false, `${motorista.id} expõe ${campo}`);
+    }
+  }
+});
+
+test('banco antigo ganha as colunas de CNH e telefone', () => {
+  const caminho = path.join(pastaTemporaria, 'motoristas-antigo.sqlite');
+  const antigo = new DatabaseSync(caminho);
+  antigo.exec(`
+    CREATE TABLE motoristas (
+      id TEXT PRIMARY KEY,
+      nome TEXT NOT NULL,
+      email TEXT UNIQUE,
+      senha TEXT,
+      veiculo TEXT NOT NULL,
+      disponivel INTEGER NOT NULL DEFAULT 1
+    );
+  `);
+  antigo.close();
+
+  criarRepositorio(caminho).fechar();
+
+  const migrado = new DatabaseSync(caminho);
+  const colunas = migrado.prepare('PRAGMA table_info(motoristas)').all().map(c => c.name);
+  migrado.close();
+  for (const coluna of ['telefone', 'cnh_numero', 'cnh_categoria', 'cnh_validade']) {
+    assert.ok(colunas.includes(coluna), coluna);
+  }
+});
+
+test('e-mail duplicado responde 409 com mensagem clara', async () => {
+  assert.equal((await cadastrarMotoristaCom({id: 'M-DUP-1', email: 'dup@teste.com'})).status, 201);
+
+  const repetido = await cadastrarMotoristaCom({id: 'M-DUP-2', email: 'dup@teste.com'});
+  assert.equal(repetido.status, 409);
+  assert.deepEqual(await repetido.json(), {mensagem: 'Este e-mail já está cadastrado.'});
+});
+
+test('e-mail duplicado com maiúsculas e espaços também responde 409', async () => {
+  const repetido = await cadastrarMotoristaCom({id: 'M-DUP-3', email: '  DUP@Teste.com '});
+  assert.equal(repetido.status, 409);
+});
+
+test('o e-mail é gravado normalizado', async () => {
+  const salvo = await (await cadastrarMotoristaCom({id: 'M-NORM', email: ' Norm@Teste.COM '})).json();
+  assert.equal(salvo.email, 'norm@teste.com');
+});
+
+function enviarCorpoBruto(metodo, caminho, corpo) {
+  return fetch(`${endereco}${caminho}`, {
+    method: metodo,
+    headers: {'Content-Type': 'application/json'},
+    body: corpo,
+  });
+}
+
+test('JSON malformado responde 400', async () => {
+  for (const [metodo, caminho] of [['PUT', '/api/rotas/RT-X'], ['POST', '/api/motoristas']]) {
+    const resposta = await enviarCorpoBruto(metodo, caminho, '{malformado');
+    assert.equal(resposta.status, 400, `${metodo} ${caminho}`);
+    assert.deepEqual(await resposta.json(), {mensagem: 'JSON inválido.'});
+  }
+});
+
+test('corpo vazio responde 400', async () => {
+  assert.equal((await enviarCorpoBruto('PUT', '/api/rotas/RT-X', '')).status, 400);
+});
+
+test('JSON válido que não é objeto responde 400', async () => {
+  for (const corpo of ['null', '"texto"', '42', '[]']) {
+    const resposta = await enviarCorpoBruto('PUT', '/api/rotas/RT-X', corpo);
+    assert.equal(resposta.status, 400, corpo);
+    assert.deepEqual(await resposta.json(), {
+      mensagem: 'O corpo da requisição deve ser um objeto JSON.',
+    });
+  }
 });
