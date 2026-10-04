@@ -109,6 +109,17 @@ function criarServidor(caminhoBanco) {
         return;
       }
 
+      if (requisicao.method === 'POST' && url.pathname === '/api/motoristas') {
+        const motorista = await lerJson(requisicao);
+        if (!motorista.id || !motorista.nome || !motorista.email || !motorista.senha || !motorista.veiculo) {
+          responder(resposta, 400, {mensagem: 'Dados obrigatórios faltando.'});
+          return;
+        }
+        const salvo = repositorio.salvarMotorista(motorista);
+        responder(resposta, 201, salvo);
+        return;
+      }
+
       if (requisicao.method === 'GET' && url.pathname === '/api/motoristas') {
         responder(resposta, 200, repositorio.listarMotoristas());
         return;

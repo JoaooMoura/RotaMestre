@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import {Botao, Cabecalho} from '../componentes';
 import {estilos} from '../estilos';
+import {cadastrarMotorista} from '../servicos/api';
 import {Perfil} from '../tipos';
 
 type Etapa =
@@ -230,12 +231,24 @@ export function TelaAutenticacao({onEntrar}: Props) {
           <TextInput style={estilos.input} value={ano} onChangeText={setAno} keyboardType="number-pad" />
           <Botao
             titulo="Finalizar cadastro"
-            onPress={() => {
+            onPress={async () => {
               if (!placa || !modelo || !ano) {
                 Alert.alert('Campos obrigatórios', 'Preencha os dados do veículo.');
                 return;
               }
-              setEtapa('concluido');
+              try {
+                await cadastrarMotorista({
+                  id: Date.now().toString(),
+                  nome,
+                  email,
+                  senha,
+                  veiculo: `${modelo} • ${placa}`,
+                  disponivel: true,
+                });
+                setEtapa('concluido');
+              } catch (e: any) {
+                Alert.alert('Erro no cadastro', e.message);
+              }
             }}
           />
         </View>

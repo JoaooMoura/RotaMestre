@@ -24,6 +24,13 @@ export function buscarMotoristas() {
   return requisicao<Motorista[]>('/motoristas');
 }
 
+export function cadastrarMotorista(motorista: any) {
+  return requisicao('/motoristas', {
+    method: 'POST',
+    body: JSON.stringify(motorista),
+  });
+}
+
 export function buscarRotaAtual() {
   return requisicao<Rota>('/rotas/atual');
 }

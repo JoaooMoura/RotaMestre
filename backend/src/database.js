@@ -2,26 +2,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const {DatabaseSync} = require('node:sqlite');
 
-const MOTORISTAS_INICIAIS = [
-  {
-    id: '1',
-    nome: 'Carlos Mendes',
-    veiculo: 'Mercedes-Benz Sprinter • ABC-1234',
-    disponivel: true,
-  },
-  {
-    id: '2',
-    nome: 'Ana Paula Souza',
-    veiculo: 'Fiat Ducato • XYZ-5678',
-    disponivel: true,
-  },
-  {
-    id: '3',
-    nome: 'Ricardo Ferreira',
-    veiculo: 'Ford Transit • DEF-9012',
-    disponivel: true,
-  },
-];
+
 
 const ROTA_INICIAL = {
   id: 'RT-001',
@@ -70,6 +51,8 @@ function criarRepositorio(caminhoBanco) {
     CREATE TABLE IF NOT EXISTS motoristas (
       id TEXT PRIMARY KEY,
       nome TEXT NOT NULL,
+      email TEXT UNIQUE,
+      senha TEXT,
       veiculo TEXT NOT NULL,
       disponivel INTEGER NOT NULL DEFAULT 1
     );
@@ -100,23 +83,26 @@ function criarRepositorio(caminhoBanco) {
     );
   `);
 
-  const inserirMotorista = banco.prepare(`
-    INSERT OR IGNORE INTO motoristas (id, nome, veiculo, disponivel)
-    VALUES (?, ?, ?, ?)
-  `);
-
-  for (const motorista of MOTORISTAS_INICIAIS) {
-    inserirMotorista.run(
-      motorista.id,
-      motorista.nome,
-      motorista.veiculo,
-      motorista.disponivel ? 1 : 0,
-    );
+  function salvarMotorista(motorista) {
+    banco
+      .prepare(`
+        INSERT INTO motoristas (id, nome, email, senha, veiculo, disponivel)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `)
+      .run(
+        motorista.id,
+        motorista.nome,
+        motorista.email,
+        motorista.senha,
+        motorista.veiculo,
+        motorista.disponivel ? 1 : 0,
+      );
+    return motorista;
   }
 
   function listarMotoristas() {
     return banco
-      .prepare('SELECT id, nome, veiculo, disponivel FROM motoristas ORDER BY nome')
+      .prepare('SELECT id, nome, email, senha, veiculo, disponivel FROM motoristas ORDER BY nome')
       .all()
       .map(motorista => ({
         ...motorista,
@@ -256,12 +242,21 @@ function criarRepositorio(caminhoBanco) {
   }
 
   if (!buscarRotaAtual()) {
+    salvarMotorista({
+      id: '1',
+      nome: 'Carlos Mendes (Demo)',
+      email: 'motorista@rotamestre.com',
+      senha: '123',
+      veiculo: 'Mercedes-Benz Sprinter • ABC-1234',
+      disponivel: true,
+    });
     salvarRota(ROTA_INICIAL);
   }
 
   return {
     buscarRotaAtual,
     listarMotoristas,
+    salvarMotorista,
     salvarRota,
     fechar: () => banco.close(),
   };

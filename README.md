@@ -1,281 +1,238 @@
 # RotaMestre
 
-Plataforma para motoristas profissionais e gestores de frota, com recursos de planejamento de rotas, navegação, execução de entregas, comunicação e acompanhamento operacional.
+<br>
+
+## 🌀 Protótipo Navegável
+**:link: Clique no link abaixo para visualizar o Protótipo Navegável do projeto:**  
+> [Protótipo Navegável](https://www.figma.com/make/1VkbUL3B6XL8jct0X9eRHj/Read-the-prompt?fullscreen=1&t=TtKunWDrsCcNMzIX-1&code-node-id=0-6)
+
+<br>
+
+---
+
+## 📱 Escopo do Protótipo
+
+O protótipo atual representa a **Sprint 1 — Fundação e operação básica** do RotaMestre, em formato **mobile**, com foco nos principais fluxos de uso do motorista e do gestor. **É um único aplicativo com dois tipos de conta (motorista e gestor), sem painel web separado.**
+
+### ✅ O que já está prototipado
+
+- Cadastro de motorista, CNH e veículo;
+- Login com separação entre os perfis **Motorista** e **Gestor**;
+- Confirmação de acesso por código enviado por e-mail;
+- Recuperação de senha;
+- Resumo diário do motorista;
+- Central de notificações;
+- Consulta da rota e das paradas;
+- Início, pausa e retomada da rota;
+- Adição e remoção de paradas durante a pausa;
+- Atualização do status das entregas;
+- Verificação visual de presença no destino;
+- Coleta de assinatura do recebedor;
+- Anexo de foto do comprovante;
+- Telas de gestão da frota (criação/atribuição de rotas) dentro do próprio app.
+
+### 🚧 Próximas etapas
+
+As funcionalidades de **mapa, navegação, localização contínua, recálculo de rota e operação offline** estão previstas para a Sprint 2. Recursos como **chat, botão de pânico, histórico de viagens, acompanhamento de frota e acessibilidade avançada** fazem parte da Sprint 3. O restante dos requisitos do documento (não essenciais ao MVP) está listado na seção **Backlog Pós-MVP**, ao final deste documento.
+
+<br>
+
+---
+
+## 📋 Backlog (MVP — Sprints 1 a 3)
+
+### Sprint 1 — Fundação e operação básica
+Objetivo: Permitir cadastro/acesso, e planejar e executar rotas e entregas.
+
+| User Story | Descrição | Requisitos |
+| :--- | :--- | :--- |
+| US02.01 - Cadastrar motorista e veículo | Como motorista, quero cadastrar meus dados pessoais, CNH e veículo, para me identificar e utilizar o sistema. | RF01, RF29, RNF04, RNF11 |
+| US02.02 - Entrar e manter a sessão | Como motorista, quero entrar com e-mail e senha e manter minha sessão quando escolher, para acessar minhas atividades com segurança. | RF02, RF18, RNF04, RNF11 |
+| US02.03 - Recuperar a senha por e-mail | Como motorista, quero recuperar minha senha por e-mail, para voltar a acessar o aplicativo quando esquecer a credencial. | RF02, RNF04 |
+| US02.04 - Confirmar acesso por código de e-mail | Como motorista, quero confirmar meu login com um código recebido por e-mail, para proteger o acesso à minha conta. | RF18, RNF04 |
+| US02.05 - Separar acesso de gestor e motorista | Como gestor, quero que cada perfil acesse somente as operações autorizadas, para proteger os dados e a gestão da frota. | RF19, RF25, RF58, RNF04, RNF11 |
+| US03.01 - Acessar as telas de gestão da frota | Como gestor, quero acessar as telas de gestão da frota dentro do aplicativo, para administrar a operação sem depender de um sistema separado. | RF19, RF25, RNF07, RNF08 |
+| US03.02 - Atribuir rota e entregá-la ao motorista | Como gestor, quero atribuir uma rota a um motorista, para organizar a execução das entregas. | RF19, RF58 |
+| US03.03 - Reatribuir rota em caso de imprevisto | Como gestor, quero reatribuir uma rota a outro motorista, para continuar a operação diante de um imprevisto. | RF19, RF58 |
+| US03.05 - Receber push de atribuições e alterações | Como motorista, quero receber notificações de novas rotas e alterações, para saber quando minha programação mudar. | RF19, RF40 |
+| US03.06 - Consultar o resumo diário | Como motorista, quero visualizar o resumo da minha jornada, para conhecer o trabalho programado para o dia. | RF03, RNF03, RNF07 |
+| US04.01 - Cadastrar a programação de uma rota | Como gestor, quero cadastrar uma rota com pontos de coleta e entrega, para preparar sua atribuição a um motorista. | RF04, RF09, RF19 |
+| US04.02 - Otimizar paradas com janelas de horário | Como gestor, quero obter uma sequência de coletas e entregas que considere tempos e janelas de horário, para organizar um trajeto eficiente. | RF04, RNF03 |
+| US04.03 - Adicionar parada durante a execução | Como motorista, quero adicionar uma parada imprevista à rota, para ajustar meu percurso durante a viagem. | RF07 |
+| US04.04 - Pausar e retomar a rota | Como motorista, quero pausar e retomar uma rota preservando seu estado, para continuar a viagem após uma interrupção. | RF31 |
+| US04.05 - Ajustar paradas com a navegação pausada | Como motorista, quero adicionar ou remover paradas durante uma pausa, para retomar a navegação com a programação ajustada. | RF07, RF31 |
+| US07.01 - Consultar paradas e atualizar status | Como motorista, quero consultar as paradas e atualizar o status das entregas, para registrar o andamento do trabalho. | RF09, RNF07 |
+| US07.02 - Verificar presença no destino | Como motorista, quero que minha localização seja verificada ao confirmar a entrega, para comprovar que estou no destino informado. | RF27 |
+| US07.03 - Coletar a assinatura do recebedor | Como motorista, quero coletar a assinatura do recebedor, para registrar o comprovante da entrega. | RF10, RNF07, RNF11 |
+| US07.04 - Anexar foto do comprovante com conexão | Como motorista, quero anexar uma foto do comprovante quando estiver conectado, para complementar o registro da entrega. | RF10, RNF04, RNF11 |
+
+### Sprint 2 — Navegação, mapa e operação offline
+Objetivo: Guiar o motorista até o destino e manter o app funcional mesmo com conexão instável.
+
+| User Story | Descrição | Requisitos |
+| :--- | :--- | :--- |
+| US05.01 - Visualizar o trajeto no mapa | Como motorista, quero visualizar minha rota em um mapa interativo, para compreender o trajeto e as paradas. | RF05, RNF03, RNF07 |
+| US05.02 - Navegar com instruções visuais e de voz | Como motorista, quero receber instruções visuais e faladas para cada manobra, para seguir a rota durante a condução. | RF05, RNF03, RNF07, RNF09 |
+| US05.03 - Manter a localização durante a viagem | Como motorista, quero que minha localização continue sendo acompanhada durante a viagem, para manter o andamento da rota atualizado. | RF06, RNF03, RNF09 |
+| US05.04 - Recalcular após desvio com conexão | Como motorista, quero receber um novo trajeto quando sair da rota, para continuar até as paradas restantes. | RF06 |
+| US05.05 - Receber alertas de navegação | Como motorista, quero receber alertas de aproximação, desvio e excesso de velocidade, para perceber situações relevantes durante o percurso. | RF17, RNF07 |
+| US05.06 - Restringir interações durante movimento | Como motorista, quero que interações que exijam digitação sejam restringidas em movimento, para reduzir distrações. | RF53, RNF07 |
+| US05.07 - Consultar previsão de chegada | Como motorista, quero acompanhar a previsão de chegada a cada destino, para conhecer o andamento da jornada. | RF54 |
+| US06.01 - Baixar rota e mapa regional | Como motorista, quero baixar previamente minha rota e os recursos do mapa, para consultá-los sem conexão. | RF08, RF64, RNF05, RNF09 |
+| US06.02 - Consultar rota baixada sem rede | Como motorista, quero abrir minha rota já baixada sem internet, para consultar o percurso e suas paradas. | RF08, RF64, RNF05 |
+| US06.03 - Guardar assinatura coletada offline | Como motorista, quero coletar e guardar a assinatura do recebedor sem internet, para preservar o comprovante até recuperar a conexão. | RF08, RF10, RNF04, RNF05, RNF11 |
+| US06.04 - Sincronizar assinaturas ao reconectar | Como motorista, quero que assinaturas pendentes sejam enviadas quando a conexão voltar, para completar o registro dos comprovantes. | RF08, RF24, RNF05 |
+| US06.05 - Receber atualizações em segundo plano | Como motorista, quero receber atualizações da programação em segundo plano, para consultar as informações disponíveis mais recentes. | RF24, RNF05, RNF09 |
+
+### Sprint 3 — Comunicação, acompanhamento e qualidade
+Objetivo: Fechar o MVP com comunicação em emergência, acompanhamento de frota, histórico consultável e acessibilidade.
+
+| User Story | Descrição | Requisitos |
+| :--- | :--- | :--- |
+| US03.04 - Acompanhar a frota no mapa | Como gestor, quero acompanhar a localização e as tarefas dos motoristas no mapa, para conhecer o andamento da operação. | RF19, RF25, RF58, RNF03, RNF09 |
+| US08.01 - Trocar mensagens de texto com a central | Como motorista, quero trocar mensagens de texto com a central, para esclarecer situações durante a operação. | RF14, RNF04 |
+| US08.02 - Compartilhar fotos e localização no chat | Como motorista, quero enviar fotos e compartilhar minha localização com a central no chat, para explicar a situação da viagem. | RF14, RNF04, RNF09, RNF11 |
+| US08.03 - Acionar o botão de pânico | Como motorista, quero acionar um alerta de emergência para a central e meus contatos, para comunicar uma situação crítica com minha localização. | RF12, RNF04, RNF11 |
+| US08.04 - Cadastrar contatos de emergência | Como motorista, quero cadastrar os contatos que receberão os e-mails de emergência, para direcionar os alertas às pessoas escolhidas. | RF12 |
+| US09.01 - Consultar histórico de viagens | Como motorista, quero consultar e filtrar minhas viagens realizadas, para conferir a execução do trabalho. | RF15, RNF03, RNF11 |
+| US09.02 - Registrar e reproduzir o trajeto | Como motorista, quero registrar o trajeto em segundo plano e reproduzi-lo depois, para analisar por onde passei. | RF28, RNF03, RNF09, RNF11 |
+| US11.01 - Utilizar uma interface adequada à condução | Como motorista, quero controles claros e legíveis, para consultar e operar o aplicativo com menor distração. | RNF07 |
+| US11.02 - Usar TalkBack e fontes ajustáveis | Como motorista, quero utilizar leitor de tela e fontes ajustadas, para acessar o aplicativo conforme minhas necessidades de visão. | RNF12 |
+
+<br>
+
+---
 
-O produto é composto por um aplicativo Android em React Native e um backend em Node.js. A experiência do gestor também prevê integração com uma solução web de gestão de frota.
+## 🔧 Itens técnicos / infraestrutura (MVP)
 
-## Protótipo navegável
+Estes itens não são pedidos de usuário — são trabalho de engenharia necessário para sustentar o backlog acima. Por isso não seguem o formato "Como X, quero, para". Estão separados das User Stories para deixar claro o que é requisito do produto e o que é decisão de construção/operação.
 
-O protótipo apresenta os principais fluxos iniciais do motorista e do gestor em formato mobile.
+| Item | Descrição | Origem |
+| :--- | :--- | :--- |
+| T01 - Hospedar em VM gratuita de nuvem | Disponibilizar backend, banco e serviços de mapa em infraestrutura sem custo recorrente. | **Decisão própria de orçamento — não exigida pelo documento.** Relacionado indiretamente a RNF01, RNF02. |
+| T02 - Delimitar dados geográficos ao Vale do Paraíba | Restringir o recorte de mapa/roteirização à região de operação inicial, para caber nos recursos disponíveis. | **Decisão própria de escopo regional — não exigida pelo documento.** Relacionado indiretamente a RF04, RF05, RF08, RF64. |
+| T03 - Validar viabilidade dos serviços na VM de 12GB | Medir o consumo real de backend + banco + serviços de mapa/rota rodando juntos, antes de depender dessa hospedagem em operação. | RNF03, RNF08, RNF09 (desempenho e otimização de recursos). |
+| T04 - Recuperar dados e republicar após falha da VM | Ter um plano de restauração caso o servidor gratuito caia ou seja reciclado. | **Não há RNF no documento que exija isso.** É uma decisão própria de continuidade, dado o risco natural de usar infraestrutura gratuita. |
+| T05 - Preparar API pronta para futura integração web | Garantir que os endpoints de rotas e status da frota estejam disponíveis para consumo externo, mesmo sem construir uma interface web nesta fase. | RF58 (atendido parcialmente nesta fase — a "visibilidade via web" fica como evolução futura; a visibilidade em si já é entregue via app, nas US03.01/03.04). |
+| T06 - Cobrir fluxos essenciais com testes automatizados | Testes unitários e de integração (Jest / React Native Testing Library) para os fluxos críticos do MVP. | RNF06, RNF08. |
+| T07 - Manter organização arquitetural e documentação | Seguir MVVM/DI e manter a documentação do código atualizada. | RNF01, RNF08. |
 
-[Acessar o protótipo navegável no Figma](https://www.figma.com/make/1VkbUL3B6XL8jct0X9eRHj/Read-the-prompt?fullscreen=1&t=TtKunWDrsCcNMzIX-1&code-node-id=0-6)
+<br>
 
-## Escopo atual do protótipo
+---
 
-O protótipo já representa partes das seguintes macro-histórias:
+## 📎 Nota sobre RF58
 
-| História | Funcionalidades representadas no protótipo |
-|---|---|
-| US01 | Cadastro de motorista, CNH e veículo; login; recuperação de senha; perfis Motorista e Gestor; confirmação por código de e-mail |
-| US02 | Resumo diário do motorista |
-| US05 | Criação e organização básica de rotas |
-| US09 | Início, pausa e retomada da rota; adição e remoção de paradas durante a pausa |
-| US11 | Consulta de paradas e atualização do status das entregas |
-| US12 | Verificação visual de presença, assinatura do recebedor e foto do comprovante |
-| US14 | Dashboard do gestor; atribuição e reatribuição de motoristas; central de notificações |
+O documento original descreve RF58 como o aplicativo sincronizando dados com "um sistema de gestão de frota baseado na web". Nesta fase, optamos por entregar a visibilidade do gestor **dentro do próprio aplicativo** (US03.01, US03.04), em vez de construir um painel web dedicado — o que reduz significativamente o escopo de infraestrutura sem deixar de atender à necessidade real do requisito (gestor acompanhar a operação). A integração com um sistema web externo fica registrada como evolução possível (T05), não como pendência do MVP.
 
-> A presença de uma macro-história nesta tabela não significa que todos os seus critérios estejam prototipados. O protótipo demonstra apenas as funcionalidades explicitamente listadas.
+<br>
 
-> A US14 prevê uma experiência web para o gestor no produto final. Na etapa atual, parte desse fluxo foi adaptada para mobile para permitir a validação inicial da interação.
+---
 
-## Backlog do produto
+## 📦 Backlog Pós-MVP (evolução futura)
 
-O backlog foi reconstruído a partir dos **88 requisitos do tema**:
+Requisitos classificados como diferencial na Fase 0 — ficam fora das Sprints 1-3, mas continuam registrados aqui para cobrir 100% do documento do professor. Ainda sem sprint definida.
 
-- **78 requisitos funcionais:** RF01 a RF78;
-- **10 requisitos não funcionais:** RNF01 a RNF10;
-- **20 histórias de usuário:** US01 a US20;
-- **0 requisitos sem cobertura.**
+### EP02 — Cadastro, autenticação e acesso
 
-Requisitos repetidos ou muito próximos continuam identificados separadamente, mas podem ser atendidos pela mesma história. As histórias abaixo são macro-histórias e devem ser divididas em itens menores durante o refinamento das sprints.
+| User Story | Descrição | Requisitos |
+| :--- | :--- | :--- |
+| HU02.06 - Entrar com conta Google | Como motorista, quero entrar usando minha conta Google, para simplificar meu acesso ao aplicativo. | RF69, RNF04, RNF11 |
 
-### Histórias de alta prioridade
+### EP04 — Planejamento e alteração de rotas
 
-| ID | História de usuário | Requisitos cobertos |
-|---|---|---|
-| **US01 - Criar conta e acessar o sistema com segurança** | Como motorista, quero cadastrar minha conta e acessar o RotaMestre por um processo seguro, para utilizar minhas informações e rotas sem expor meus dados. | RF01, RF02, RF18, RF29, RF68, RF73 |
-| **US02 - Consultar o resumo da jornada** | Como motorista, quero consultar um resumo atualizado da minha jornada, para conhecer rapidamente o trabalho previsto e o próximo compromisso. | RF03, RF23 |
-| **US05 - Montar e otimizar uma rota** | Como motorista ou gestor, quero montar uma rota com vários destinos e obter uma sequência eficiente, para reduzir tempo e deslocamento no atendimento das paradas. | RF04, RF32, RF37, RF46, RF53, RF64 |
-| **US07 - Visualizar e seguir a navegação da rota** | Como motorista, quero visualizar e seguir a rota com instruções claras, para chegar a cada destino com segurança e previsibilidade. | RF05, RF55, RF61, RF65 |
-| **US08 - Manter a localização e corrigir desvios** | Como motorista, quero que o aplicativo acompanhe minha posição e corrija a rota quando eu me desviar, para continuar recebendo orientações úteis mesmo com variações do sinal. | RF06, RF63, RF72 |
-| **US09 - Alterar e concluir o percurso em andamento** | Como motorista, quero ajustar uma rota já iniciada e calcular meu retorno, para reagir a imprevistos sem perder o progresso da viagem. | RF07, RF31, RF34, RF52, RF69, RF76 |
-| **US10 - Trabalhar com conexão intermitente** | Como motorista, quero acessar os dados necessários da rota e registrar o trabalho mesmo com internet instável, para continuar a operação sem perder informações. | RF08, RF24, RF57, RF66 |
-| **US11 - Executar paradas e atualizar entregas** | Como motorista, quero consultar minhas paradas e atualizar rapidamente cada atendimento, para manter a execução da rota organizada e visível à central. | RF09, RF11, RF60 |
-| **US12 - Comprovar a entrega e a condição da carga** | Como motorista, quero registrar evidências da entrega, do veículo e da carga, para comprovar que a operação ocorreu nas condições informadas. | RF10, RF27, RF42, RF58 |
-| **US13 - Comunicar ocorrências e compartilhar a viagem** | Como motorista, quero me comunicar e compartilhar informações da viagem com pessoas autorizadas, para coordenar o trabalho e pedir ajuda quando necessário. | RF12, RF14, RF39, RF48, RF67 |
-| **US14 - Administrar e acompanhar a frota** | Como gestor de frota, quero atribuir rotas e acompanhar sua execução em uma visão web, para coordenar os motoristas e reagir a mudanças da operação. | RF19, RF25, RF40, RF49, RF59 |
-| **US15 - Receber alertas sem aumentar a distração** | Como motorista, quero receber alertas relevantes e limitar interações arriscadas, para conduzir com mais segurança e menos distrações. | RF17, RF41, RF43, RF51, RF54 |
-| **US20 - Utilizar um aplicativo confiável, seguro e atualizável** | Como motorista ou gestor, quero usar um aplicativo Android estável, seguro, eficiente e fácil de atualizar, para realizar minhas atividades sem travamentos, perda de dados ou exposição de informações. | RNF01 a RNF10 |
+| User Story | Descrição | Requisitos |
+| :--- | :--- | :--- |
+| HU04.06 - Considerar restrições de caminhões | Como motorista, quero informar as características do caminhão, para obter rotas compatíveis com as restrições do veículo. | RF21 |
+| HU04.07 - Reordenar paradas manualmente | Como motorista, quero reordenar as paradas arrastando os itens, para ajustar a sequência da minha rota. | RF32 |
+| HU04.08 - Adicionar ponto de interesse sugerido | Como motorista, quero receber sugestões de postos, restaurantes e áreas de descanso, para acrescentar uma parada útil ao percurso. | RF34 |
+| HU04.09 - Comparar alternativas com trânsito | Como motorista, quero comparar rotas alternativas diante de trânsito intenso, para escolher o percurso mais adequado. | RF35 |
+| HU04.10 - Escolher perfil de condução | Como motorista, quero escolher um perfil Econômico, Normal ou Rápido, para ajustar o planejamento às minhas preferências. | RF37 |
+| HU04.11 - Planejar transporte de passageiros | Como motorista, quero organizar embarques e desembarques considerando lotação e preferências, para planejar viagens com vários passageiros. | RF38 |
+| HU04.12 - Agrupar entregas próximas | Como gestor, quero agrupar entregas próximas em uma rota, para reduzir deslocamentos na programação. | RF46 |
+| HU04.13 - Calcular retorno ao ponto de partida | Como motorista, quero calcular a volta ao ponto de partida após as entregas, para organizar o encerramento da viagem. | RF51 |
+| HU04.14 - Importar destinos de arquivo | Como motorista, quero importar destinos de CSV ou Excel, para carregar uma lista de endereços com menos digitação. | RF52 |
+| HU04.15 - Reutilizar locais favoritos | Como motorista, quero salvar locais favoritos, para reutilizá-los como origem ou destino. | RF62 |
+| HU04.16 - Enviar feedback sobre a rota | Como motorista, quero informar bloqueios ou problemas na rota sugerida, para contribuir com a melhoria das sugestões. | RF72 |
 
-### Histórias de média prioridade
+### EP05 — Mapas, navegação e localização
 
-| ID | História de usuário | Requisitos cobertos |
-|---|---|---|
-| **US03 - Personalizar uma interface acessível** | Como motorista, quero adaptar idioma, aparência e acessibilidade do aplicativo, para utilizá-lo com conforto e autonomia. | RF20, RF22, RF78 |
-| **US04 - Aprender a usar o aplicativo e obter suporte** | Como novo motorista, quero conhecer as funções do RotaMestre e acessar ajuda quando necessário, para usar o aplicativo corretamente antes e durante o trabalho. | RF30, RF50, RF74 |
-| **US06 - Planejar viagens para caminhões e passageiros** | Como motorista profissional, quero planejar a rota de acordo com o tipo e as características do veículo, para receber um percurso compatível com minha operação. | RF21, RF38 |
-| **US16 - Consultar trânsito, clima e pontos de interesse** | Como motorista, quero consultar condições e serviços relevantes ao longo da rota, para escolher melhor o percurso e planejar minhas paradas. | RF35, RF45, RF56, RF62 |
-| **US17 - Consultar telemetria e histórico das viagens** | Como motorista, quero consultar o histórico e os indicadores das minhas viagens, para prestar contas e identificar oportunidades de melhoria. | RF13, RF15, RF28, RF70, RF71 |
-| **US18 - Analisar resultados e fornecer feedback** | Como motorista ou gestor, quero analisar resultados e registrar avaliações sobre entregas e rotas, para acompanhar o desempenho e melhorar o serviço. | RF16, RF26, RF36, RF44, RF77 |
-| **US19 - Planejar custos e manutenção do veículo** | Como motorista, quero acompanhar custos previstos e necessidades de manutenção, para planejar a viagem e cuidar do veículo. | RF33, RF47, RF75 |
+| User Story | Descrição | Requisitos |
+| :--- | :--- | :--- |
+| HU05.08 - Consultar alertas viários ampliados | Como motorista, quero consultar alertas de limites, radares e rodízio na rota, para conhecer restrições relevantes do percurso. | RF41 |
+| HU05.09 - Consultar clima ao longo da rota | Como motorista, quero visualizar a previsão do tempo no percurso, para me preparar para as condições esperadas. | RF45 |
+| HU05.10 - Visualizar trânsito em tempo real | Como motorista, quero visualizar a fluidez do trânsito no mapa, para conhecer as condições do trajeto. | RF55 |
+| HU05.11 - Filtrar pontos de interesse | Como motorista, quero filtrar pontos de interesse no mapa, para encontrar serviços úteis ao percurso. | RF60 |
+| HU05.12 - Melhorar orientação combinando sensores | Como motorista, quero uma orientação que combine os sensores disponíveis, para melhorar a leitura da direção em condições de GPS fraco. | RF61 |
+| HU05.13 - Visualizar rota em 3D | Como motorista, quero visualizar a rota em uma vista 3D, para perceber melhor o terreno e as curvas. | RF63 |
+| HU05.14 - Estimar posição com GPS instável | Como motorista, quero uma estimativa de posição quando o GPS estiver instável, para manter orientação durante a perda do sinal. | RF68 |
 
-## Critérios de aceite resumidos
+### EP06 — Operação offline e sincronização
 
-### US01 - Conta e acesso
+| User Story | Descrição | Requisitos |
+| :--- | :--- | :--- |
+| HU06.06 - Ativar economia de dados | Como motorista, quero ativar um modo de economia de dados, para reduzir o consumo do meu plano móvel. | RF56, RNF09 |
 
-- Cadastrar dados pessoais, CNH e veículo com validação local e no servidor.
-- Entrar com e-mail e senha, recuperar a senha e manter a sessão quando autorizado.
-- Exigir segundo fator por e-mail ou SMS e permitir login associado ao Google.
-- Proteger credenciais, dados pessoais e localização no dispositivo e na comunicação.
+### EP07 — Execução e comprovação de entregas
 
-### US02 - Resumo da jornada
+| User Story | Descrição | Requisitos |
+| :--- | :--- | :--- |
+| HU07.05 - Identificar pacote por código | Como motorista, quero ler QR Code ou código de barras, para identificar o pacote ou ponto de entrega com menos digitação. | RF11 |
+| HU07.06 - Receber avaliações de entregas | Como motorista, quero consultar as avaliações recebidas pelas entregas, para acompanhar a percepção dos destinatários sobre meu serviço. | RF26 |
+| HU07.07 - Registrar condição do veículo ou carga | Como motorista, quero fotografar o veículo ou a carga no início e no final da viagem, para documentar sua condição. | RF42 |
 
-- Exibir viagens ou entregas do dia, quilômetros previstos e estimativa de término.
-- Diferenciar carregamento, ausência de programação e erro de comunicação.
-- Mostrar próximo destino e ETA em um widget Android com proteção de privacidade.
+### EP08 — Comunicação e emergência
 
-### US03 - Personalização e acessibilidade
+| User Story | Descrição | Requisitos |
+| :--- | :--- | :--- |
+| HU08.05 - Compartilhar acompanhamento temporário | Como motorista, quero compartilhar um link temporário da viagem com um contato, para permitir que ele acompanhe minha localização e meu status. | RF39, RNF04, RNF11 |
+| HU08.06 - Iniciar chamada pelo telefone | Como motorista, quero iniciar uma chamada para a central ou destinatário pelo aplicativo, para facilitar o contato telefônico. | RF48 |
+| HU08.07 - Compartilhar rota com a equipe | Como motorista, quero compartilhar uma rota planejada com outros motoristas da frota, para coordenar uma operação conjunta. | RF65 |
 
-- Disponibilizar português, inglês e espanhol.
-- Aplicar modo escuro com contraste adequado em todas as telas.
-- Permitir TalkBack e fontes ajustáveis sem ocultar ações essenciais.
+### EP09 — Histórico e acompanhamento da execução
 
-### US04 - Aprendizado e suporte
+| User Story | Descrição | Requisitos |
+| :--- | :--- | :--- |
+| HU09.03 - Registrar telemetria da viagem | Como gestor, quero consultar indicadores de telemetria das viagens, para acompanhar o desempenho operacional. | RF13, RNF03, RNF09 |
+| HU09.04 - Exportar relatório de atividades | Como motorista, quero gerar um relatório PDF de um período, para prestar contas das minhas atividades. | RF16 |
+| HU09.05 - Receber relatório semanal por e-mail | Como motorista, quero receber um relatório semanal de desempenho por e-mail, para acompanhar minha evolução. | RF36 |
+| HU09.06 - Visualizar concentração das entregas | Como motorista, quero visualizar um mapa de calor das entregas frequentes, para identificar concentrações no meu trabalho. | RF44 |
+| HU09.07 - Reconsultar rotas apenas visualizadas | Como motorista, quero consultar as rotas que já visualizei, para encontrá-las novamente mesmo sem ter iniciado a navegação. | RF66 |
+| HU09.08 - Analisar tempo por etapa | Como motorista, quero consultar o tempo gasto em cada etapa da rota, para identificar onde ocorrem demoras. | RF67 |
 
-- Apresentar tutorial no primeiro acesso e permitir sua consulta posterior.
-- Simular uma rota sem GPS em um modo claramente identificado como demonstração.
-- Oferecer perguntas frequentes e formulário de contato com confirmação de envio.
+### EP10 — Custos da viagem e manutenção veicular
 
-### US05 - Planejamento e otimização
+| User Story | Descrição | Requisitos |
+| :--- | :--- | :--- |
+| HU10.01 - Estimar custo de combustível | Como motorista, quero visualizar o custo estimado da viagem, para considerar a despesa de combustível no planejamento. | RF33 |
+| HU10.02 - Acompanhar necessidade de manutenção | Como motorista, quero receber avisos de manutenção e consultar oficinas próximas, para acompanhar os cuidados com o veículo. | RF47 |
+| HU10.03 - Comparar custos com orçamento | Como motorista, quero definir um orçamento para combustível e pedágios, para perceber quando o custo previsto ultrapassar meu limite. | RF71 |
 
-- Receber destinos manualmente ou por CSV/Excel e identificar entradas inválidas.
-- Permitir favoritos, agrupamento de entregas próximas e reordenação manual.
-- Calcular a sequência considerando distância, tempo, janelas e perfil de condução.
-- Informar paradas ou restrições inviáveis sem apresentar uma rota impossível como válida.
+### EP11 — Usabilidade, acessibilidade e personalização
 
-### US06 - Caminhões e passageiros
+| User Story | Descrição | Requisitos |
+| :--- | :--- | :--- |
+| HU11.03 - Escolher idioma do aplicativo | Como motorista, quero utilizar português, inglês ou espanhol, para compreender o aplicativo no idioma escolhido. | RF20 |
+| HU11.04 - Ativar modo escuro | Como motorista, quero utilizar um tema escuro, para melhorar a leitura durante o uso noturno. | RF22, RNF07 |
+| HU11.05 - Consultar a jornada pelo widget | Como motorista, quero consultar próximo destino e previsão de chegada no widget Android, para obter um resumo sem abrir o aplicativo. | RF23, RNF09 |
+| HU11.06 - Conhecer o aplicativo no primeiro acesso | Como motorista, quero um tutorial interativo no primeiro login, para conhecer as funcionalidades principais. | RF30 |
+| HU11.07 - Suspender avisos não essenciais | Como motorista, quero ativar o modo soneca durante o descanso, para suspender notificações não essenciais. | RF43 |
+| HU11.08 - Consultar ajuda e contatar suporte | Como motorista, quero consultar dúvidas frequentes e enviar uma solicitação de suporte, para resolver dificuldades de uso. | RF49 |
+| HU11.09 - Personalizar alertas | Como motorista, quero configurar alertas de eventos da viagem, para receber avisos conforme minhas preferências. | RF50 |
+| HU11.10 - Experimentar uma rota simulada | Como motorista, quero experimentar uma rota sem utilizar GPS, para conhecer as funcionalidades antes da operação real. | RF70 |
 
-- Considerar altura, peso, comprimento e tipo de carga quando houver dados viários confiáveis.
-- Indicar quando não houver informação suficiente para garantir a passagem do caminhão.
-- No modo passageiro, respeitar embarques, desembarques, lotação e preferências cadastradas.
+### EP12 — Qualidade, desempenho e evolução técnica
 
-### US07 - Navegação
+| User Story | Descrição | Requisitos |
+| :--- | :--- | :--- |
+| HU12.05 - Receber pequenas atualizações OTA | Como motorista, quero receber correções e pequenas melhorias pelo mecanismo OTA, para atualizar o aplicativo com menor necessidade de redistribuição. | RNF10 |
 
-- Exibir origem, destino, paradas e trajeto em mapa interativo.
-- Fornecer instruções visuais e por voz para cada manobra.
-- Atualizar o ETA por destino e oferecer vista 3D quando suportada.
+## ❓ Itens a validar com o professor/orientador
 
-### US08 - Localização e desvios
+Pontos do documento original com alcance ambíguo — ainda não classificados como MVP nem diferencial.
 
-- Acompanhar a localização, inclusive em segundo plano quando permitido.
-- Recalcular a rota após desvio acima da tolerância configurada.
-- Combinar sensores e usar dead reckoning temporário quando o GPS estiver instável.
-- Identificar posição estimada, falta de permissão, perda de sinal e falha de recálculo.
-
-### US09 - Alterações durante a rota
-
-- Adicionar paradas e pontos sugeridos e recalcular a partir da posição atual.
-- Pausar, alterar e retomar a rota preservando o trabalho concluído.
-- Calcular o retorno ao ponto de partida, considerando trânsito quando disponível.
-- Manter a última rota válida se a alteração falhar.
-
-### US10 - Operação com rede intermitente
-
-- Baixar rota, entregas e mapa antes da viagem.
-- Manter disponíveis os dados baixados e armazenar operações offline permitidas.
-- Sincronizar ao reconectar sem perder silenciosamente conflitos ou rejeições.
-- Oferecer cache de mapas, atualizações em segundo plano e economia de dados.
-
-### US11 - Paradas e status
-
-- Listar endereço, destinatário, instruções e status de cada parada.
-- Ler QR Code ou código de barras sem alterar itens quando o código for inválido.
-- Enviar mensagens rápidas de status e refletir mudanças confirmadas no servidor.
-
-### US12 - Evidências da operação
-
-- Coletar assinatura, foto do comprovante e validação geográfica da entrega.
-- Registrar fotos do veículo ou da carga no início e no fim da viagem.
-- Anexar documentos fiscais por foto ou código de barras.
-- Mostrar o estado de envio e preservar evidências pendentes.
-
-### US13 - Comunicação e emergência
-
-- Permitir chat com texto, fotos e localização e iniciar chamadas telefônicas.
-- Compartilhar rota com motoristas autorizados e gerar link temporário de acompanhamento.
-- Enviar alerta de pânico com a localização mais recente para central e contatos.
-- Não confirmar falsamente o envio quando houver falha de rede ou localização.
-
-### US14 - Gestão da frota
-
-- Atribuir e reatribuir rotas preservando registros já realizados.
-- Notificar o motorista sobre atribuições, inclusões e cancelamentos.
-- Exibir no mapa motoristas, atualização da posição, rota e status das tarefas.
-- Sincronizar aplicativo e sistema web e impedir acesso a equipes não autorizadas.
-
-### US15 - Alertas e condução segura
-
-- Alertar aproximação, desvio e excesso de velocidade.
-- Exibir limites, radares e rodízio somente com fonte identificada.
-- Permitir alertas personalizados e modo soneca sem ocultar eventos críticos.
-- Restringir digitação em movimento sem bloquear o botão de pânico.
-
-### US16 - Contexto da rota
-
-- Exibir trânsito em tempo real e comparar alternativas por tempo e distância.
-- Mostrar previsão do tempo com horário de referência.
-- Filtrar postos, descanso e alimentação; indicar fonte e atualização de preços.
-- Identificar indisponibilidade de dados externos.
-
-### US17 - Telemetria e histórico
-
-- Registrar telemetria, trajeto, duração, quilometragem e eventos da viagem.
-- Filtrar viagens e reproduzir o percurso no mapa.
-- Manter histórico de rotas visualizadas e tempo gasto por etapa.
-- Identificar lacunas de telemetria sem inventar dados.
-
-### US18 - Relatórios e feedback
-
-- Gerar relatório de atividades por período e exportá-lo em PDF.
-- Enviar relatório semanal com pontualidade, eficiência e feedback dos clientes.
-- Registrar avaliação da entrega e feedback sobre a rota.
-- Apresentar mapa de calor e indicar como métricas e pontuações foram calculadas.
-
-### US19 - Custos e manutenção
-
-- Estimar combustível com base em distância, consumo e preço informado.
-- Comparar combustível e pedágios com o orçamento e alertar ultrapassagens.
-- Gerar lembretes de manutenção por quilometragem e sugerir oficinas disponíveis.
-
-### US20 - Qualidade do produto
-
-- Manter backend Node.js, aplicativo React Native, responsabilidades separadas e código versionado.
-- Distribuir APK Android compatível com as versões-alvo.
-- Manter fluidez em dispositivo de baixo custo e proteger dados sensíveis.
-- Cobrir regras, APIs e fluxos críticos com testes adequados.
-- Aplicar interface de baixa distração, arquitetura definida e documentação atualizada.
-- Reduzir consumo de bateria e dados e permitir atualizações OTA compatíveis com a plataforma.
-
-## Critérios transversais
-
-1. Carregamento, ausência de dados, falta de permissão, operação offline e erro devem ser estados visualmente diferentes.
-2. Nenhuma operação pode ser apresentada como concluída antes da confirmação local ou do servidor aplicável ao fluxo.
-3. Dados inválidos devem ser recusados no aplicativo e no backend.
-4. Localização e dados pessoais só podem ser acessados por usuários e contatos autorizados.
-5. Trânsito, clima, radares, restrições, preços e oficinas devem indicar indisponibilidade ou data da atualização.
-6. Alterações em qualquer US devem preservar testes, acessibilidade, segurança, desempenho e documentação previstos na US20.
-7. Funcionalidades em segundo plano devem respeitar as permissões, limitações e políticas do Android.
-
-## Rastreabilidade
-
-### Requisitos funcionais
-
-| US | Requisitos funcionais |
-|---|---|
-| US01 | RF01, RF02, RF18, RF29, RF68, RF73 |
-| US02 | RF03, RF23 |
-| US03 | RF20, RF22, RF78 |
-| US04 | RF30, RF50, RF74 |
-| US05 | RF04, RF32, RF37, RF46, RF53, RF64 |
-| US06 | RF21, RF38 |
-| US07 | RF05, RF55, RF61, RF65 |
-| US08 | RF06, RF63, RF72 |
-| US09 | RF07, RF31, RF34, RF52, RF69, RF76 |
-| US10 | RF08, RF24, RF57, RF66 |
-| US11 | RF09, RF11, RF60 |
-| US12 | RF10, RF27, RF42, RF58 |
-| US13 | RF12, RF14, RF39, RF48, RF67 |
-| US14 | RF19, RF25, RF40, RF49, RF59 |
-| US15 | RF17, RF41, RF43, RF51, RF54 |
-| US16 | RF35, RF45, RF56, RF62 |
-| US17 | RF13, RF15, RF28, RF70, RF71 |
-| US18 | RF16, RF26, RF36, RF44, RF77 |
-| US19 | RF33, RF47, RF75 |
-
-### Requisitos não funcionais
-
-| Requisito | Cobertura principal |
-|---|---|
-| RNF01 | US20 e critério transversal 6 |
-| RNF02 | US20 |
-| RNF03 | US07, US08, US17 e US20 |
-| RNF04 | US01, US10, US12, US13, US14, US17 e US20 |
-| RNF05 | US10, US12 e US20 |
-| RNF06 | US20 e critério transversal 6 |
-| RNF07 | US03, US07, US11, US15 e US20 |
-| RNF08 | US20 e critério transversal 6 |
-| RNF09 | US08, US10, US14, US17 e US20 |
-| RNF10 | US20 |
-
-## Conferência de cobertura
-
-| Conjunto | Esperado | Mapeado | Sem cobertura |
-|---|---:|---:|---:|
-| Requisitos funcionais | 78 | 78 | 0 |
-| Requisitos não funcionais | 10 | 10 | 0 |
-| **Total** | **88** | **88** | **0** |
-
-## Tecnologias previstas
-
-- **Aplicativo:** React Native para Android;
-- **Backend:** Node.js;
-- **Autenticação:** JWT, recuperação de senha e segundo fator;
-- **Mapas e localização:** mapas interativos, GPS e sensores do dispositivo;
-- **Persistência offline:** banco local e sincronização posterior;
-- **Comunicação:** notificações push e comunicação em tempo real;
-- **Qualidade:** testes unitários, de integração e de interface;
-- **Organização:** versionamento Git, separação de responsabilidades, arquitetura definida e documentação.
-
-## Observação de planejamento
-
-Este README apresenta o backlog do produto, não uma promessa de entrega por sprint. Por agruparem os 88 requisitos em apenas 20 itens, várias US possuem tamanho de épico e deverão ser refinadas e divididas antes da estimativa e da distribuição em sprints.
+| User Story | Descrição | Requisitos |
+| :--- | :--- | :--- |
+| HU07.08 - Registrar documentos fiscais | Como motorista, quero registrar documentos fiscais da carga por foto ou leitura de código, para associá-los à operação. | RF57 |
+| HU08.08 - Enviar mensagem rápida de status | Como motorista, quero enviar um status predefinido com um toque, para atualizar a central rapidamente. | RF59 |
+| HU08.09 - Conversar com o destinatário da entrega | Como motorista, quero conversar com o destinatário da entrega, para alinhar informações sobre o recebimento. | RF14, RNF04, RNF11 |
