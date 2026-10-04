@@ -8,5 +8,8 @@
   },
   "engines": {
     "node": ">=22.13.0"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.3"
   }
 }

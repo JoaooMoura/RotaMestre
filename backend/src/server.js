@@ -2,6 +2,7 @@ const http = require('node:http');
 const path = require('node:path');
 const {Buffer} = require('node:buffer');
 const {URL} = require('node:url');
+const bcrypt = require('bcryptjs');
 const {criarRepositorio} = require('./database');
 
 const TIPOS_PARADA = new Set(['Coleta', 'Entrega']);
@@ -115,6 +116,7 @@ function criarServidor(caminhoBanco) {
           responder(resposta, 400, {mensagem: 'Dados obrigatórios faltando.'});
           return;
         }
+        motorista.senha = await bcrypt.hash(motorista.senha, 10);
         const salvo = repositorio.salvarMotorista(motorista);
         responder(resposta, 201, salvo);
         return;

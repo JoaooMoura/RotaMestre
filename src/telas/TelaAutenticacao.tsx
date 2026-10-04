@@ -8,6 +8,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import MaskInput, {Masks} from 'react-native-mask-input';
 import {Botao, Cabecalho} from '../componentes';
 import {estilos} from '../estilos';
 import {cadastrarMotorista} from '../servicos/api';
@@ -155,7 +156,7 @@ export function TelaAutenticacao({onEntrar}: Props) {
 
   if (etapa === 'cadastro1') {
     return (
-      <ScrollView style={estilos.tela}>
+      <ScrollView key="cadastro1" style={estilos.tela}>
         <Cabecalho titulo="Dados pessoais" subtitulo="Etapa 1 de 3" onVoltar={() => setEtapa('login')} />
         <View style={estilos.conteudo}>
           <Text style={estilos.rotulo}>Nome completo</Text>
@@ -169,11 +170,12 @@ export function TelaAutenticacao({onEntrar}: Props) {
             keyboardType="email-address"
           />
           <Text style={estilos.rotulo}>Telefone</Text>
-          <TextInput
+          <MaskInput
             style={estilos.input}
             value={telefone}
             onChangeText={setTelefone}
             keyboardType="phone-pad"
+            mask={Masks.BRL_PHONE}
           />
           <Text style={estilos.rotulo}>Senha</Text>
           <TextInput style={estilos.input} value={senha} onChangeText={setSenha} secureTextEntry />
@@ -194,15 +196,15 @@ export function TelaAutenticacao({onEntrar}: Props) {
 
   if (etapa === 'cadastro2') {
     return (
-      <ScrollView style={estilos.tela}>
+      <ScrollView key="cadastro2" style={estilos.tela}>
         <Cabecalho titulo="Carteira de habilitação" subtitulo="Etapa 2 de 3" onVoltar={() => setEtapa('cadastro1')} />
         <View style={estilos.conteudo}>
           <Text style={estilos.rotulo}>Número da CNH</Text>
-          <TextInput style={estilos.input} value={cnh} onChangeText={setCnh} keyboardType="number-pad" />
+          <MaskInput style={estilos.input} value={cnh} onChangeText={setCnh} keyboardType="number-pad" mask={[/\d/, /\d/, /\d/, /\d/, /\d/, /\d/, /\d/, /\d/, /\d/, /\d/, /\d/]} />
           <Text style={estilos.rotulo}>Categoria</Text>
-          <TextInput style={estilos.input} value={categoria} onChangeText={setCategoria} placeholder="Ex.: B" placeholderTextColor="#94A3B8" />
+          <TextInput style={estilos.input} value={categoria} onChangeText={setCategoria} placeholder="Ex.: B" placeholderTextColor="#94A3B8" autoCapitalize="characters" maxLength={2} />
           <Text style={estilos.rotulo}>Data de validade</Text>
-          <TextInput style={estilos.input} value={validade} onChangeText={setValidade} placeholder="DD/MM/AAAA" placeholderTextColor="#94A3B8" />
+          <MaskInput style={estilos.input} value={validade} onChangeText={setValidade} placeholder="DD/MM/AAAA" placeholderTextColor="#94A3B8" mask={Masks.DATE_DDMMYYYY} keyboardType="number-pad" />
           <Botao
             titulo="Continuar"
             onPress={() => {
@@ -220,11 +222,11 @@ export function TelaAutenticacao({onEntrar}: Props) {
 
   if (etapa === 'cadastro3') {
     return (
-      <ScrollView style={estilos.tela}>
+      <ScrollView key="cadastro3" style={estilos.tela}>
         <Cabecalho titulo="Veículo" subtitulo="Etapa 3 de 3" onVoltar={() => setEtapa('cadastro2')} />
         <View style={estilos.conteudo}>
           <Text style={estilos.rotulo}>Placa</Text>
-          <TextInput style={estilos.input} value={placa} onChangeText={setPlaca} autoCapitalize="characters" />
+          <MaskInput style={estilos.input} value={placa} onChangeText={setPlaca} autoCapitalize="characters" mask={[/[a-zA-Z]/, /[a-zA-Z]/, /[a-zA-Z]/, '-', /\d/, /[a-zA-Z0-9]/, /\d/, /\d/]} placeholder="ABC-1A23 ou ABC-1234" placeholderTextColor="#94A3B8" />
           <Text style={estilos.rotulo}>Marca e modelo</Text>
           <TextInput style={estilos.input} value={modelo} onChangeText={setModelo} />
           <Text style={estilos.rotulo}>Ano</Text>

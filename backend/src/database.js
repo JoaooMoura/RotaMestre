@@ -242,11 +242,12 @@ function criarRepositorio(caminhoBanco) {
   }
 
   if (!buscarRotaAtual()) {
+    const bcrypt = require('bcryptjs');
     salvarMotorista({
       id: '1',
       nome: 'Carlos Mendes (Demo)',
       email: 'motorista@rotamestre.com',
-      senha: '123',
+      senha: bcrypt.hashSync('123', 10),
       veiculo: 'Mercedes-Benz Sprinter • ABC-1234',
       disponivel: true,
     });
