@@ -14,7 +14,9 @@
     "react": "19.2.3",
     "react-native": "0.87.1",
     "react-native-mask-input": "^1.2.3",
-    "react-native-safe-area-context": "^5.5.2"
+    "react-native-safe-area-context": "^5.5.2",
+    "react-native-signature-canvas": "^5.1.1",
+    "react-native-webview": "^14.0.1"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",

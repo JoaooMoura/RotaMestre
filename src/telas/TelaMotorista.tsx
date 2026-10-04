@@ -12,6 +12,7 @@ import {Abas, Badge, Botao, Cabecalho, CardParada} from '../componentes';
 import {notificacoesIniciais} from '../dados';
 import {cores, estilos} from '../estilos';
 import {Parada, Rota, StatusParada, TipoParada} from '../tipos';
+import SignatureScreen from 'react-native-signature-canvas';
 
 type Aba = 'Hoje' | 'Minha rota' | 'Notificações' | 'Perfil';
 type Fluxo =
@@ -44,8 +45,9 @@ export function TelaMotorista({rota, onAtualizarRota, onSair}: Props) {
   const [statusEscolhido, setStatusEscolhido] = useState<StatusParada>('Em andamento');
   const [motivo, setMotivo] = useState('');
   const [nomeRecebedor, setNomeRecebedor] = useState('');
-  const [assinatura, setAssinatura] = useState(false);
+  const [assinatura, setAssinatura] = useState('');
   const [foto, setFoto] = useState(false);
+  const signatureRef = React.useRef<any>(null);
 
   const paradaSelecionada =
     rota.paradas.find(item => item.id === paradaId) ?? rota.paradas[0];
@@ -295,12 +297,34 @@ export function TelaMotorista({rota, onAtualizarRota, onSair}: Props) {
         <View style={estilos.conteudo}>
           <Text style={estilos.rotulo}>Nome do recebedor</Text>
           <TextInput style={estilos.input} value={nomeRecebedor} onChangeText={setNomeRecebedor} />
-          <Pressable style={estilos.assinatura} onPress={() => setAssinatura(true)}>
-            <Text style={assinatura ? estilos.assinaturaTexto : estilos.texto}>
-              {assinatura ? nomeRecebedor || 'Assinatura' : 'Toque para simular a assinatura'}
-            </Text>
-          </Pressable>
-          <Botao titulo="Limpar assinatura" secundario onPress={() => setAssinatura(false)} />
+          {assinatura ? (
+            <View style={{height: 200, backgroundColor: '#f0f0f0', justifyContent: 'center', alignItems: 'center', marginBottom: 16}}>
+              <Text>Assinatura salva com sucesso (Base64)</Text>
+            </View>
+          ) : (
+            <View style={{height: 200, marginBottom: 16}}>
+              <SignatureScreen
+                ref={signatureRef}
+                onOK={(sig) => setAssinatura(sig)}
+                onEmpty={() => Alert.alert('Aviso', 'Por favor, assine antes de confirmar.')}
+                descriptionText="Assine aqui"
+                clearText="Limpar"
+                confirmText="Salvar"
+                webStyle=".m-signature-pad--footer {display: none; margin: 0px;}"
+              />
+            </View>
+          )}
+          <Botao
+            titulo={assinatura ? "Refazer assinatura" : "Confirmar traço"}
+            secundario
+            onPress={() => {
+              if (assinatura) {
+                setAssinatura('');
+              } else {
+                signatureRef.current?.readSignature();
+              }
+            }}
+          />
           <Botao
             titulo="Confirmar assinatura"
             desabilitado={!assinatura || !nomeRecebedor.trim()}
