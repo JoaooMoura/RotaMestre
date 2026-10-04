@@ -87,11 +87,18 @@ function criarRepositorio(caminhoBanco) {
       parada_id TEXT NOT NULL,
       recebedor TEXT NOT NULL,
       assinatura TEXT NOT NULL,
+      foto TEXT,
       registrado_em INTEGER NOT NULL,
       PRIMARY KEY (rota_id, parada_id),
       FOREIGN KEY (rota_id) REFERENCES rotas(id) ON DELETE CASCADE
     );
   `);
+
+  // Bancos criados antes da US07.04 já têm a tabela, mas sem a coluna foto.
+  const colunasComprovante = banco.prepare('PRAGMA table_info(comprovantes)').all();
+  if (!colunasComprovante.some(coluna => coluna.name === 'foto')) {
+    banco.exec('ALTER TABLE comprovantes ADD COLUMN foto TEXT');
+  }
 
   function listarParadas(rotaId) {
     return banco
@@ -207,11 +214,12 @@ function criarRepositorio(caminhoBanco) {
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
       const salvarComprovante = banco.prepare(`
-        INSERT INTO comprovantes (rota_id, parada_id, recebedor, assinatura, registrado_em)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO comprovantes (rota_id, parada_id, recebedor, assinatura, foto, registrado_em)
+        VALUES (?, ?, ?, ?, ?, ?)
         ON CONFLICT(rota_id, parada_id) DO UPDATE SET
           recebedor = excluded.recebedor,
           assinatura = excluded.assinatura,
+          foto = excluded.foto,
           registrado_em = excluded.registrado_em
       `);
 
@@ -234,6 +242,7 @@ function criarRepositorio(caminhoBanco) {
             parada.id,
             parada.comprovante.recebedor.trim(),
             parada.comprovante.assinatura,
+            parada.comprovante.foto ?? null,
             Date.now(),
           );
         }

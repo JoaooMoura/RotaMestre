@@ -14,6 +14,28 @@ import {notificacoesIniciais} from '../dados';
 import {cores, estilos} from '../estilos';
 import {Comprovante, Parada, Rota, StatusParada, TipoParada} from '../tipos';
 import SignatureScreen, {SignatureViewRef} from 'react-native-signature-canvas';
+import {
+  CameraOptions,
+  ImageLibraryOptions,
+  ImagePickerResponse,
+  launchCamera,
+  launchImageLibrary,
+} from 'react-native-image-picker';
+
+const FOTO_MAX_BYTES = 512 * 1024;
+// Mesmos formatos aceitos pelo backend (fotoValida em server.js).
+const TIPOS_FOTO_ACEITOS = ['image/jpeg', 'image/png'];
+const OPCOES_FOTO: CameraOptions = {
+  mediaType: 'photo',
+  includeBase64: true,
+  maxWidth: 1024,
+  maxHeight: 1024,
+  quality: 0.5,
+};
+const OPCOES_GALERIA: ImageLibraryOptions = {
+  ...OPCOES_FOTO,
+  restrictMimeTypes: TIPOS_FOTO_ACEITOS,
+};
 
 type Aba = 'Hoje' | 'Minha rota' | 'Notificações' | 'Perfil';
 type Fluxo =
@@ -47,7 +69,9 @@ export function TelaMotorista({rota, onAtualizarRota, onSair}: Props) {
   const [motivo, setMotivo] = useState('');
   const [nomeRecebedor, setNomeRecebedor] = useState('');
   const [assinatura, setAssinatura] = useState('');
-  const [foto, setFoto] = useState(false);
+  const [foto, setFoto] = useState('');
+  const [enviandoEntrega, setEnviandoEntrega] = useState(false);
+  const envioEmAndamento = React.useRef(false);
   const [rolagemAtiva, setRolagemAtiva] = useState(true);
   const signatureRef = React.useRef<SignatureViewRef>(null);
 
@@ -76,6 +100,58 @@ export function TelaMotorista({rota, onAtualizarRota, onSair}: Props) {
       paradas,
       status: todasConcluidas ? 'Concluída' : rota.status,
     });
+  }
+
+  async function anexarFoto(origem: 'camera' | 'galeria') {
+    const resultado: ImagePickerResponse =
+      origem === 'camera'
+        ? await launchCamera(OPCOES_FOTO)
+        : await launchImageLibrary(OPCOES_GALERIA);
+
+    if (resultado.didCancel) {
+      return;
+    }
+    if (resultado.errorCode) {
+      Alert.alert('Foto', resultado.errorMessage ?? 'Não foi possível obter a foto.');
+      return;
+    }
+
+    const imagem = resultado.assets?.[0];
+    if (!imagem?.base64) {
+      return;
+    }
+
+    // restrictMimeTypes é só uma sugestão ao seletor do Android; a conferência garante a regra do backend.
+    const tipo = imagem.type ?? 'image/jpeg';
+    if (!TIPOS_FOTO_ACEITOS.includes(tipo)) {
+      Alert.alert('Formato não suportado', 'Escolha uma foto em JPEG ou PNG, ou use a câmera.');
+      return;
+    }
+
+    const dataUri = `data:${tipo};base64,${imagem.base64}`;
+    if (dataUri.length > FOTO_MAX_BYTES) {
+      Alert.alert('Foto muito grande', 'Tire outra foto mais próxima do comprovante.');
+      return;
+    }
+    setFoto(dataUri);
+  }
+
+  async function confirmarEntrega() {
+    if (envioEmAndamento.current) {
+      return;
+    }
+    envioEmAndamento.current = true;
+    setEnviandoEntrega(true);
+
+    try {
+      const comprovante = {recebedor: nomeRecebedor.trim(), assinatura, foto};
+      if (await atualizarParada('Concluída', comprovante)) {
+        setFluxo('concluida');
+      }
+    } finally {
+      envioEmAndamento.current = false;
+      setEnviandoEntrega(false);
+    }
   }
 
   function trocarAba(item: string) {
@@ -348,21 +424,22 @@ export function TelaMotorista({rota, onAtualizarRota, onSair}: Props) {
       <ScrollView style={estilos.tela}>
         <Cabecalho titulo="Foto do comprovante" onVoltar={() => setFluxo('assinatura')} />
         <View style={estilos.conteudo}>
-          <Pressable style={estilos.foto} onPress={() => setFoto(true)}>
-            <Text style={estilos.fotoTexto}>
-              {foto ? 'Comprovante anexado para demonstração' : 'Toque para simular uma foto'}
-            </Text>
+          <Pressable style={estilos.foto} onPress={() => anexarFoto('camera')}>
+            {foto ? (
+              <Image source={{uri: foto}} style={estilos.fotoPreview} />
+            ) : (
+              <Text style={estilos.fotoTexto}>Toque para fotografar o comprovante</Text>
+            )}
           </Pressable>
-          {foto ? <Botao titulo="Remover foto" secundario perigo onPress={() => setFoto(false)} /> : null}
+          {foto ? (
+            <Botao titulo="Remover foto" secundario perigo onPress={() => setFoto('')} />
+          ) : (
+            <Botao titulo="Escolher da galeria" secundario onPress={() => anexarFoto('galeria')} />
+          )}
           <Botao
-            titulo="Confirmar entrega"
-            desabilitado={!foto}
-            onPress={async () => {
-              const comprovante = {recebedor: nomeRecebedor.trim(), assinatura};
-              if (await atualizarParada('Concluída', comprovante)) {
-                setFluxo('concluida');
-              }
-            }}
+            titulo={enviandoEntrega ? 'Enviando...' : 'Confirmar entrega'}
+            desabilitado={!foto || enviandoEntrega}
+            onPress={confirmarEntrega}
           />
         </View>
       </ScrollView>
@@ -384,7 +461,7 @@ export function TelaMotorista({rota, onAtualizarRota, onSair}: Props) {
             titulo="Ir para próxima parada"
             onPress={() => {
               setAssinatura('');
-              setFoto(false);
+              setFoto('');
               setNomeRecebedor('');
               setFluxo('ativa');
             }}

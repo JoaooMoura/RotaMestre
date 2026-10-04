@@ -24,19 +24,30 @@ function textoValido(valor) {
 }
 
 const ASSINATURA_MAX_BYTES = 512 * 1024;
+const FOTO_MAX_BYTES = 512 * 1024;
+const CORPO_MAX_BYTES = 2 * 1024 * 1024;
+
+function fotoValida(foto) {
+  return (
+    typeof foto === 'string' &&
+    /^data:image\/(jpeg|png);base64,/.test(foto) &&
+    foto.length <= FOTO_MAX_BYTES
+  );
+}
 
 function comprovanteValido(comprovante, status) {
   if (!comprovante || !textoValido(comprovante.recebedor)) {
     return false;
   }
   if (comprovante.assinatura === undefined) {
-    return true;
+    return comprovante.foto === undefined;
   }
   return (
     status === 'Concluída' &&
     typeof comprovante.assinatura === 'string' &&
     comprovante.assinatura.startsWith('data:image/png;base64,') &&
-    comprovante.assinatura.length <= ASSINATURA_MAX_BYTES
+    comprovante.assinatura.length <= ASSINATURA_MAX_BYTES &&
+    (comprovante.foto === undefined || fotoValida(comprovante.foto))
   );
 }
 
@@ -94,21 +105,36 @@ function responder(resposta, status, corpo) {
   resposta.end(JSON.stringify(corpo));
 }
 
+function erroHttp(status, mensagem) {
+  const erro = new Error(mensagem);
+  erro.status = status;
+  return erro;
+}
+
 function lerJson(requisicao) {
   return new Promise((resolve, reject) => {
-    let corpo = '';
+    const partes = [];
+    let tamanho = 0;
+    let excedeu = false;
 
     requisicao.on('data', parte => {
-      corpo += parte;
-      if (Buffer.byteLength(corpo) > 1024 * 1024) {
-        reject(new Error('Corpo da requisição excede 1 MB.'));
-        requisicao.destroy();
+      tamanho += parte.length;
+      if (tamanho > CORPO_MAX_BYTES) {
+        // Continua lendo sem guardar: destruir a conexão impede o cliente de receber o 413.
+        excedeu = true;
+        partes.length = 0;
+        return;
       }
+      partes.push(parte);
     });
 
     requisicao.on('end', () => {
+      if (excedeu) {
+        reject(erroHttp(413, 'Corpo da requisição excede 2 MB.'));
+        return;
+      }
       try {
-        resolve(JSON.parse(corpo));
+        resolve(JSON.parse(Buffer.concat(partes).toString('utf8')));
       } catch {
         reject(new Error('JSON inválido.'));
       }
@@ -186,7 +212,7 @@ function criarServidor(caminhoBanco) {
     } catch (erro) {
       const mensagem =
         erro instanceof Error ? erro.message : 'Erro interno do servidor.';
-      const status = mensagem.includes('FOREIGN KEY') ? 400 : 500;
+      const status = erro.status ?? (mensagem.includes('FOREIGN KEY') ? 400 : 500);
       responder(resposta, status, {mensagem});
     }
   });

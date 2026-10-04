@@ -25,6 +25,8 @@ export type Comprovante = {
   recebedor: string;
   // Data URI PNG, enviado apenas no salvamento que conclui a entrega.
   assinatura?: string;
+  // Data URI JPEG/PNG comprimido; enviado junto com a assinatura.
+  foto?: string;
   registradoEm?: number;
 };
 

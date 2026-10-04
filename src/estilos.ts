@@ -255,8 +255,10 @@ export const estilos = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginVertical: 14,
+    overflow: 'hidden',
   },
   fotoTexto: {color: cores.textoSuave, fontSize: 15, fontWeight: '700'},
+  fotoPreview: {width: '100%', height: '100%', resizeMode: 'cover'},
   contador: {
     color: cores.textoSuave,
     fontSize: 13,
