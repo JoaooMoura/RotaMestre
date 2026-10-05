@@ -1,290 +1,340 @@
 // Jest Snapshot v1, https://goo.gl/fbAQLP
 
 exports[`TelaMotorista - foto do comprovante (US07.04) renderiza a etapa da foto sem imagem anexada 1`] = `
-<RCTScrollView
+<View
   style={
     {
-      "backgroundColor": "#F8FAFC",
+      "backgroundColor": "#FFFFFF",
       "flex": 1,
     }
   }
 >
-  <View>
-    <View
+  <View
+    collapsable={false}
+    style={
+      {
+        "flex": 1,
+        "opacity": 0,
+        "transform": [
+          {
+            "translateY": 8,
+          },
+        ],
+      }
+    }
+  >
+    <RCTScrollView
       style={
         {
-          "backgroundColor": "#1D4ED8",
-          "paddingHorizontal": 20,
-          "paddingVertical": 20,
+          "backgroundColor": "#F8FAFC",
+          "flex": 1,
         }
       }
     >
-      <View
-        style={
-          {
-            "alignItems": "center",
-            "flexDirection": "row",
-            "justifyContent": "space-between",
-          }
-        }
-      >
+      <View>
         <View
           style={
             {
-              "flex": 1,
-            }
-          }
-        >
-          <Text
-            style={
-              {
-                "color": "#FFFFFF",
-                "fontSize": 24,
-                "fontWeight": "800",
-              }
-            }
-          >
-            Foto do comprovante
-          </Text>
-        </View>
-        <View
-          accessibilityState={
-            {
-              "busy": undefined,
-              "checked": undefined,
-              "disabled": undefined,
-              "expanded": undefined,
-              "selected": undefined,
-            }
-          }
-          accessibilityValue={
-            {
-              "max": undefined,
-              "min": undefined,
-              "now": undefined,
-              "text": undefined,
-            }
-          }
-          accessible={true}
-          collapsable={false}
-          focusable={true}
-          onBlur={[Function]}
-          onClick={[Function]}
-          onFocus={[Function]}
-          onResponderGrant={[Function]}
-          onResponderMove={[Function]}
-          onResponderRelease={[Function]}
-          onResponderTerminate={[Function]}
-          onResponderTerminationRequest={[Function]}
-          onStartShouldSetResponder={[Function]}
-        >
-          <Text
-            style={
-              {
-                "color": "#FFFFFF",
-                "fontSize": 16,
-                "fontWeight": "700",
-                "paddingRight": 14,
-                "paddingVertical": 8,
-              }
-            }
-          >
-            Voltar
-          </Text>
-        </View>
-      </View>
-    </View>
-    <View
-      style={
-        {
-          "padding": 16,
-          "paddingBottom": 104,
-        }
-      }
-    >
-      <View
-        accessibilityState={
-          {
-            "busy": undefined,
-            "checked": undefined,
-            "disabled": undefined,
-            "expanded": undefined,
-            "selected": undefined,
-          }
-        }
-        accessibilityValue={
-          {
-            "max": undefined,
-            "min": undefined,
-            "now": undefined,
-            "text": undefined,
-          }
-        }
-        accessible={true}
-        collapsable={false}
-        focusable={true}
-        onBlur={[Function]}
-        onClick={[Function]}
-        onFocus={[Function]}
-        onResponderGrant={[Function]}
-        onResponderMove={[Function]}
-        onResponderRelease={[Function]}
-        onResponderTerminate={[Function]}
-        onResponderTerminationRequest={[Function]}
-        onStartShouldSetResponder={[Function]}
-        style={
-          {
-            "alignItems": "center",
-            "backgroundColor": "#E2E8F0",
-            "borderRadius": 16,
-            "height": 190,
-            "justifyContent": "center",
-            "marginVertical": 14,
-            "overflow": "hidden",
-          }
-        }
-      >
-        <Text
-          style={
-            {
-              "color": "#64748B",
-              "fontSize": 15,
-              "fontWeight": "700",
-            }
-          }
-        >
-          Toque para fotografar o comprovante
-        </Text>
-      </View>
-      <View
-        accessibilityRole="button"
-        accessibilityState={
-          {
-            "busy": undefined,
-            "checked": undefined,
-            "disabled": undefined,
-            "expanded": undefined,
-            "selected": undefined,
-          }
-        }
-        accessibilityValue={
-          {
-            "max": undefined,
-            "min": undefined,
-            "now": undefined,
-            "text": undefined,
-          }
-        }
-        accessible={true}
-        collapsable={false}
-        focusable={true}
-        onBlur={[Function]}
-        onClick={[Function]}
-        onFocus={[Function]}
-        onResponderGrant={[Function]}
-        onResponderMove={[Function]}
-        onResponderRelease={[Function]}
-        onResponderTerminate={[Function]}
-        onResponderTerminationRequest={[Function]}
-        onStartShouldSetResponder={[Function]}
-        style={
-          [
-            {
-              "alignItems": "center",
-              "backgroundColor": "#FFFFFF",
-              "borderColor": "#1D4ED8",
-              "borderRadius": 14,
-              "borderWidth": 1,
-              "justifyContent": "center",
-              "marginTop": 10,
-              "minHeight": 50,
-              "paddingHorizontal": 18,
-            },
-            undefined,
-            undefined,
-          ]
-        }
-      >
-        <Text
-          style={
-            [
-              {
-                "color": "#1D4ED8",
-                "fontSize": 15,
-                "fontWeight": "800",
-              },
-              undefined,
-            ]
-          }
-        >
-          Escolher da galeria
-        </Text>
-      </View>
-      <View
-        accessibilityRole="button"
-        accessibilityState={
-          {
-            "busy": undefined,
-            "checked": undefined,
-            "disabled": true,
-            "expanded": undefined,
-            "selected": undefined,
-          }
-        }
-        accessibilityValue={
-          {
-            "max": undefined,
-            "min": undefined,
-            "now": undefined,
-            "text": undefined,
-          }
-        }
-        accessible={true}
-        collapsable={false}
-        focusable={true}
-        onBlur={[Function]}
-        onClick={[Function]}
-        onFocus={[Function]}
-        onResponderGrant={[Function]}
-        onResponderMove={[Function]}
-        onResponderRelease={[Function]}
-        onResponderTerminate={[Function]}
-        onResponderTerminationRequest={[Function]}
-        onStartShouldSetResponder={[Function]}
-        style={
-          [
-            {
-              "alignItems": "center",
               "backgroundColor": "#1D4ED8",
-              "borderRadius": 14,
-              "justifyContent": "center",
-              "marginTop": 12,
-              "minHeight": 52,
-              "paddingHorizontal": 18,
-            },
-            undefined,
-            {
-              "opacity": 0.45,
-            },
-          ]
-        }
-      >
-        <Text
-          style={
-            [
-              {
-                "color": "#FFFFFF",
-                "fontSize": 16,
-                "fontWeight": "800",
-              },
-              undefined,
-            ]
+              "paddingHorizontal": 20,
+              "paddingVertical": 20,
+            }
           }
         >
-          Confirmar entrega
-        </Text>
+          <View
+            style={
+              {
+                "alignItems": "center",
+                "flexDirection": "row",
+                "justifyContent": "space-between",
+              }
+            }
+          >
+            <View
+              style={
+                {
+                  "flex": 1,
+                }
+              }
+            >
+              <Text
+                style={
+                  {
+                    "color": "#FFFFFF",
+                    "fontSize": 24,
+                    "fontWeight": "800",
+                  }
+                }
+              >
+                Foto do comprovante
+              </Text>
+            </View>
+            <View
+              accessibilityState={
+                {
+                  "busy": undefined,
+                  "checked": undefined,
+                  "disabled": undefined,
+                  "expanded": undefined,
+                  "selected": undefined,
+                }
+              }
+              accessibilityValue={
+                {
+                  "max": undefined,
+                  "min": undefined,
+                  "now": undefined,
+                  "text": undefined,
+                }
+              }
+              accessible={true}
+              collapsable={false}
+              focusable={true}
+              onBlur={[Function]}
+              onClick={[Function]}
+              onFocus={[Function]}
+              onResponderGrant={[Function]}
+              onResponderMove={[Function]}
+              onResponderRelease={[Function]}
+              onResponderTerminate={[Function]}
+              onResponderTerminationRequest={[Function]}
+              onStartShouldSetResponder={[Function]}
+            >
+              <Text
+                style={
+                  {
+                    "color": "#FFFFFF",
+                    "fontSize": 16,
+                    "fontWeight": "700",
+                    "paddingRight": 14,
+                    "paddingVertical": 8,
+                  }
+                }
+              >
+                Voltar
+              </Text>
+            </View>
+          </View>
+        </View>
+        <View
+          style={
+            {
+              "padding": 16,
+              "paddingBottom": 104,
+            }
+          }
+        >
+          <View
+            accessibilityState={
+              {
+                "busy": undefined,
+                "checked": undefined,
+                "disabled": undefined,
+                "expanded": undefined,
+                "selected": undefined,
+              }
+            }
+            accessibilityValue={
+              {
+                "max": undefined,
+                "min": undefined,
+                "now": undefined,
+                "text": undefined,
+              }
+            }
+            accessible={true}
+            collapsable={false}
+            focusable={true}
+            onBlur={[Function]}
+            onClick={[Function]}
+            onFocus={[Function]}
+            onResponderGrant={[Function]}
+            onResponderMove={[Function]}
+            onResponderRelease={[Function]}
+            onResponderTerminate={[Function]}
+            onResponderTerminationRequest={[Function]}
+            onStartShouldSetResponder={[Function]}
+            style={
+              {
+                "alignItems": "center",
+                "backgroundColor": "#E2E8F0",
+                "borderRadius": 16,
+                "height": 190,
+                "justifyContent": "center",
+                "marginVertical": 14,
+                "overflow": "hidden",
+              }
+            }
+          >
+            <Text
+              style={
+                {
+                  "color": "#64748B",
+                  "fontSize": 15,
+                  "fontWeight": "700",
+                }
+              }
+            >
+              Toque para fotografar o comprovante
+            </Text>
+          </View>
+          <View
+            collapsable={false}
+            style={
+              {
+                "transform": [
+                  {
+                    "scale": 1,
+                  },
+                ],
+              }
+            }
+          >
+            <View
+              accessibilityRole="button"
+              accessibilityState={
+                {
+                  "busy": undefined,
+                  "checked": undefined,
+                  "disabled": undefined,
+                  "expanded": undefined,
+                  "selected": undefined,
+                }
+              }
+              accessibilityValue={
+                {
+                  "max": undefined,
+                  "min": undefined,
+                  "now": undefined,
+                  "text": undefined,
+                }
+              }
+              accessible={true}
+              collapsable={false}
+              focusable={true}
+              onBlur={[Function]}
+              onClick={[Function]}
+              onFocus={[Function]}
+              onResponderGrant={[Function]}
+              onResponderMove={[Function]}
+              onResponderRelease={[Function]}
+              onResponderTerminate={[Function]}
+              onResponderTerminationRequest={[Function]}
+              onStartShouldSetResponder={[Function]}
+              style={
+                [
+                  {
+                    "alignItems": "center",
+                    "backgroundColor": "#FFFFFF",
+                    "borderColor": "#1D4ED8",
+                    "borderRadius": 14,
+                    "borderWidth": 1,
+                    "justifyContent": "center",
+                    "marginTop": 10,
+                    "minHeight": 50,
+                    "paddingHorizontal": 18,
+                  },
+                  undefined,
+                  undefined,
+                ]
+              }
+            >
+              <Text
+                style={
+                  [
+                    {
+                      "color": "#1D4ED8",
+                      "fontSize": 15,
+                      "fontWeight": "800",
+                    },
+                    undefined,
+                  ]
+                }
+              >
+                Escolher da galeria
+              </Text>
+            </View>
+          </View>
+          <View
+            collapsable={false}
+            style={
+              {
+                "transform": [
+                  {
+                    "scale": 1,
+                  },
+                ],
+              }
+            }
+          >
+            <View
+              accessibilityRole="button"
+              accessibilityState={
+                {
+                  "busy": undefined,
+                  "checked": undefined,
+                  "disabled": true,
+                  "expanded": undefined,
+                  "selected": undefined,
+                }
+              }
+              accessibilityValue={
+                {
+                  "max": undefined,
+                  "min": undefined,
+                  "now": undefined,
+                  "text": undefined,
+                }
+              }
+              accessible={true}
+              collapsable={false}
+              focusable={true}
+              onBlur={[Function]}
+              onClick={[Function]}
+              onFocus={[Function]}
+              onResponderGrant={[Function]}
+              onResponderMove={[Function]}
+              onResponderRelease={[Function]}
+              onResponderTerminate={[Function]}
+              onResponderTerminationRequest={[Function]}
+              onStartShouldSetResponder={[Function]}
+              style={
+                [
+                  {
+                    "alignItems": "center",
+                    "backgroundColor": "#1D4ED8",
+                    "borderRadius": 14,
+                    "justifyContent": "center",
+                    "marginTop": 12,
+                    "minHeight": 52,
+                    "paddingHorizontal": 18,
+                  },
+                  undefined,
+                  {
+                    "opacity": 0.45,
+                  },
+                ]
+              }
+            >
+              <Text
+                style={
+                  [
+                    {
+                      "color": "#FFFFFF",
+                      "fontSize": 16,
+                      "fontWeight": "800",
+                    },
+                    undefined,
+                  ]
+                }
+              >
+                Confirmar entrega
+              </Text>
+            </View>
+          </View>
+        </View>
       </View>
-    </View>
+    </RCTScrollView>
   </View>
-</RCTScrollView>
+</View>
 `;

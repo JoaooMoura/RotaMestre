@@ -3,7 +3,7 @@ import {Alert} from 'react-native';
 import {fireEvent, render, screen} from '@testing-library/react-native';
 import {launchCamera, launchImageLibrary} from 'react-native-image-picker';
 import {TelaMotorista} from '../src/telas/TelaMotorista';
-import {Rota} from '../src/tipos';
+import {Rota, Usuario} from '../src/tipos';
 
 const ASSINATURA = 'data:image/png;base64,ASSINATURA';
 const FOTO_MAX_BYTES = 512 * 1024;
@@ -32,6 +32,13 @@ jest.setTimeout(20000);
 
 const camera = launchCamera as jest.Mock;
 const galeria = launchImageLibrary as jest.Mock;
+
+const usuario: Usuario = {
+  id: '1',
+  nome: 'Motorista Teste',
+  email: 'motorista@rotamestre.com',
+  papel: 'motorista',
+};
 
 const rota: Rota = {
   id: 'RT-001',
@@ -68,7 +75,12 @@ function botao(nome: string) {
 
 async function renderizar(onAtualizarRota = jest.fn().mockResolvedValue(true)) {
   await render(
-    <TelaMotorista rota={rota} onAtualizarRota={onAtualizarRota} onSair={jest.fn()} />,
+    <TelaMotorista
+      usuario={usuario}
+      rota={rota}
+      onAtualizarRota={onAtualizarRota}
+      onSair={jest.fn()}
+    />,
   );
   return onAtualizarRota;
 }

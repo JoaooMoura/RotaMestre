@@ -1,8 +1,10 @@
 import React from 'react';
 import {ActivityIndicator, Alert, Text, View} from 'react-native';
 import {SafeAreaProvider, SafeAreaView} from 'react-native-safe-area-context';
-import {Botao} from './src/componentes';
-import {estilos} from './src/estilos';
+import {MaterialDesignIcons} from '@react-native-vector-icons/material-design-icons';
+import {Botao, BotaoContornado, BotaoPrincipal, LayoutFaixa} from './src/componentes';
+import {cores, estilos} from './src/estilos';
+import {primeiroNome} from './src/nomes';
 import {TelaAutenticacao} from './src/telas/TelaAutenticacao';
 import {TelaGestorSprint} from './src/telas/TelaGestorSprint';
 import {TelaMotorista} from './src/telas/TelaMotorista';
@@ -48,19 +50,40 @@ function ConteudoApp() {
         </View>
       );
 
-    case 'semRota':
+    case 'semRota': {
+      const motorista = usuario.papel === 'motorista';
       return (
-        <View style={estilos.centro}>
-          <Text style={[estilos.titulo, estilos.textoCentral]}>Nenhuma rota atribuída</Text>
-          <Text style={[estilos.subtitulo, estilos.textoCentral]}>
-            Quando o gestor atribuir uma rota, ela aparecerá aqui.
-          </Text>
-          <View style={estilos.larguraTotalTopo18}>
-            <Botao titulo="Atualizar" onPress={recarregar} />
-            <Botao titulo="Sair" secundario onPress={sair} />
+        <LayoutFaixa
+          faixa={
+            <>
+              <Text style={estilos.loginMarca} accessibilityRole="header">
+                Olá, {primeiroNome(usuario.nome)}
+              </Text>
+              <Text style={estilos.loginSlogan}>
+                {motorista ? 'Área do motorista' : 'Área do gestor'}
+              </Text>
+            </>
+          }>
+          <View style={estilos.iconeCirculo}>
+            <MaterialDesignIcons
+              name="map-marker-off-outline"
+              size={36}
+              color={cores.primariaPressionada}
+            />
           </View>
-        </View>
+          <Text style={estilos.loginTitulo}>
+            {motorista ? 'Nenhuma rota atribuída' : 'Nenhuma rota cadastrada'}
+          </Text>
+          <Text style={estilos.loginApoio}>
+            {motorista
+              ? 'Aguarde o gestor atribuir uma rota a você. Quando isso acontecer, toque em Atualizar para vê-la aqui.'
+              : 'Ainda não há rotas cadastradas. Quando houver, toque em Atualizar para vê-las aqui.'}
+          </Text>
+          <BotaoPrincipal titulo="Atualizar" onPress={recarregar} />
+          <BotaoContornado titulo="Sair" icone="logout" perigo onPress={sair} />
+        </LayoutFaixa>
       );
+    }
 
     case 'pronto':
       return usuario.papel === 'gestor' ? (
@@ -71,7 +94,12 @@ function ConteudoApp() {
           onSair={sair}
         />
       ) : (
-        <TelaMotorista rota={estado.rota} onAtualizarRota={salvar} onSair={sair} />
+        <TelaMotorista
+          usuario={usuario}
+          rota={estado.rota}
+          onAtualizarRota={salvar}
+          onSair={sair}
+        />
       );
   }
 }

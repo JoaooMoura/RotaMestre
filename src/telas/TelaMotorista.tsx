@@ -9,10 +9,23 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import {Abas, Badge, Botao, Cabecalho, CardParada} from '../componentes';
+import {MaterialDesignIcons} from '@react-native-vector-icons/material-design-icons';
+import {TransicaoEntrada} from '../animacoes';
+import {
+  Badge,
+  Botao,
+  BotaoContornado,
+  BotaoPrincipal,
+  Cabecalho,
+  CardParada,
+  ItemNavegacao,
+  LayoutFaixa,
+  NavegacaoInferior,
+} from '../componentes';
 import {notificacoesIniciais} from '../dados';
 import {cores, estilos} from '../estilos';
-import {Comprovante, Parada, Rota, StatusParada, TipoParada} from '../tipos';
+import {iniciais, primeiroNome} from '../nomes';
+import {Comprovante, Parada, Rota, StatusParada, TipoParada, Usuario} from '../tipos';
 import SignatureScreen, {SignatureViewRef} from 'react-native-signature-canvas';
 import {
   CameraOptions,
@@ -38,6 +51,18 @@ const OPCOES_GALERIA: ImageLibraryOptions = {
 };
 
 type Aba = 'Hoje' | 'Minha rota' | 'Notificações' | 'Perfil';
+
+const ITENS_NAVEGACAO: ItemNavegacao[] = [
+  {nome: 'Hoje', icone: 'home-outline', iconeAtivo: 'home'},
+  {nome: 'Minha rota', icone: 'map-outline', iconeAtivo: 'map'},
+  {nome: 'Notificações', icone: 'bell-outline', iconeAtivo: 'bell'},
+  {nome: 'Perfil', icone: 'account-circle-outline', iconeAtivo: 'account-circle'},
+];
+
+const NOME_PAPEL: Record<Usuario['papel'], string> = {
+  motorista: 'Motorista',
+  gestor: 'Gestor',
+};
 type Fluxo =
   | 'base'
   | 'rota'
@@ -51,13 +76,17 @@ type Fluxo =
   | 'foto'
   | 'concluida';
 
+// Etapas de tarefa em tela cheia: a navbar some para o motorista não sair no meio da entrega.
+const FLUXOS_TELA_CHEIA: Fluxo[] = ['adicionar', 'verificar', 'status', 'assinatura', 'foto', 'concluida'];
+
 type Props = {
+  usuario: Usuario;
   rota: Rota;
   onAtualizarRota: (rota: Rota) => Promise<boolean>;
   onSair: () => void;
 };
 
-export function TelaMotorista({rota, onAtualizarRota, onSair}: Props) {
+export function TelaMotorista({usuario, rota, onAtualizarRota, onSair}: Props) {
   const [aba, setAba] = useState<Aba>('Hoje');
   const [fluxo, setFluxo] = useState<Fluxo>('base');
   const [paradaId, setParadaId] = useState(rota.paradas[0]?.id ?? '');
@@ -160,360 +189,369 @@ export function TelaMotorista({rota, onAtualizarRota, onSair}: Props) {
     setFluxo(novaAba === 'Minha rota' ? 'rota' : 'base');
   }
 
+  function voltarParaHoje() {
+    setAba('Hoje');
+    setFluxo('base');
+  }
+
   function abrirParada(parada: Parada) {
     setParadaId(parada.id);
     setFluxo('detalhe');
   }
 
-  if (fluxo === 'adicionar') {
-    return (
-      <ScrollView style={estilos.tela} keyboardShouldPersistTaps="handled">
-        <Cabecalho titulo="Adicionar parada" onVoltar={() => setFluxo('pausada')} />
-        <View style={estilos.conteudo}>
-          <Text style={estilos.rotulo}>Tipo</Text>
-          <View style={estilos.linha}>
-            {(['Coleta', 'Entrega'] as TipoParada[]).map(item => (
-              <Pressable
-                key={item}
-                style={[
-                  estilos.opcao,
-                  estilos.flex,
-                  tipo === item && estilos.opcaoAtiva,
-                  item === 'Entrega' && estilos.margemEsquerda10,
-                ]}
-                onPress={() => setTipo(item)}>
-                <Text style={estilos.opcaoTexto}>{item}</Text>
-              </Pressable>
-            ))}
-          </View>
-          <Text style={estilos.rotulo}>Cliente ou destinatário</Text>
-          <TextInput style={estilos.input} value={destinatario} onChangeText={setDestinatario} />
-          <Text style={estilos.rotulo}>Endereço</Text>
-          <TextInput style={estilos.input} value={endereco} onChangeText={setEndereco} />
-          <Text style={estilos.rotulo}>Observação</Text>
-          <TextInput
-            style={[estilos.input, estilos.inputMultilinha]}
-            value={observacao}
-            onChangeText={setObservacao}
-            multiline
-          />
-          <Botao
-            titulo="Adicionar parada"
-            onPress={async () => {
-              if (!destinatario.trim() || !endereco.trim()) {
-                Alert.alert('Dados incompletos', 'Informe destinatário e endereço.');
-                return;
-              }
-              const nova: Parada = {
-                id: Date.now().toString(),
-                tipo,
-                destinatario,
-                endereco,
-                janela: 'Parada imprevista',
-                observacao,
-                status: 'Pendente',
-              };
-              const salva = await onAtualizarRota({
-                ...rota,
-                paradas: [...rota.paradas, nova],
-              });
-
-              if (!salva) {
-                return;
-              }
-
-              setDestinatario('');
-              setEndereco('');
-              setObservacao('');
-              setFluxo('pausada');
-              Alert.alert('Parada adicionada', 'A programação foi atualizada.');
-            }}
-          />
-        </View>
-      </ScrollView>
-    );
-  }
-
-  if (fluxo === 'pausada') {
-    const removivel = [...rota.paradas].reverse().find(item => item.status === 'Pendente');
-    return (
-      <ScrollView style={estilos.tela}>
-        <Cabecalho titulo="Rota pausada" subtitulo="Alterações permitidas durante a pausa" />
-        <View style={estilos.conteudo}>
-          <View style={[estilos.card, {backgroundColor: cores.roxoFundo}]}>
-            <Text style={[estilos.titulo, {color: cores.roxo}]}>Pausa ativa</Text>
-            <Text style={estilos.texto}>O progresso já concluído foi preservado.</Text>
-          </View>
-          <Botao titulo="Adicionar parada" secundario onPress={() => setFluxo('adicionar')} />
-          <Botao
-            titulo="Remover última parada futura"
-            secundario
-            perigo
-            desabilitado={!removivel}
-            onPress={() =>
-              removivel &&
-              Alert.alert(
-                'Remover parada',
-                `Deseja remover ${removivel.destinatario}?`,
-                [
-                  {text: 'Cancelar'},
-                  {
-                    text: 'Remover',
-                    onPress: async () => {
-                      await onAtualizarRota({
-                        ...rota,
-                        paradas: rota.paradas.filter(item => item.id !== removivel.id),
-                      });
-                    },
-                  },
-                ],
-              )
-            }
-          />
-          <Botao
-            titulo="Retomar rota"
-            onPress={async () => {
-              if (await atualizarStatusRota('Em andamento')) {
-                setFluxo('ativa');
-              }
-            }}
-          />
-        </View>
-      </ScrollView>
-    );
-  }
-
-  if (fluxo === 'detalhe' && paradaSelecionada) {
-    return (
-      <ScrollView style={estilos.tela}>
-        <Cabecalho titulo="Detalhes da parada" onVoltar={() => setFluxo(rota.status === 'Em andamento' ? 'ativa' : 'rota')} />
-        <View style={estilos.conteudo}>
-          <View style={estilos.card}>
-            <View style={estilos.linhaEntre}>
-              <Text style={estilos.titulo}>{paradaSelecionada.tipo}</Text>
-              <Badge status={paradaSelecionada.status} />
+  // Telas cheias do fluxo da rota (sem barra de navegação); null na área com abas.
+  function telaDoFluxo() {
+    if (fluxo === 'adicionar') {
+      return (
+        <ScrollView style={estilos.tela} keyboardShouldPersistTaps="handled">
+          <Cabecalho titulo="Adicionar parada" onVoltar={() => setFluxo('pausada')} />
+          <View style={estilos.conteudo}>
+            <Text style={estilos.rotulo}>Tipo</Text>
+            <View style={estilos.linha}>
+              {(['Coleta', 'Entrega'] as TipoParada[]).map(item => (
+                <Pressable
+                  key={item}
+                  style={[
+                    estilos.opcao,
+                    estilos.flex,
+                    tipo === item && estilos.opcaoAtiva,
+                    item === 'Entrega' && estilos.margemEsquerda10,
+                  ]}
+                  onPress={() => setTipo(item)}>
+                  <Text style={estilos.opcaoTexto}>{item}</Text>
+                </Pressable>
+              ))}
             </View>
             <Text style={estilos.rotulo}>Cliente ou destinatário</Text>
-            <Text style={estilos.valor}>{paradaSelecionada.destinatario}</Text>
+            <TextInput style={estilos.input} value={destinatario} onChangeText={setDestinatario} />
             <Text style={estilos.rotulo}>Endereço</Text>
-            <Text style={estilos.texto}>{paradaSelecionada.endereco}</Text>
-            <Text style={estilos.rotulo}>Janela de atendimento</Text>
-            <Text style={estilos.texto}>{paradaSelecionada.janela}</Text>
-            <Text style={estilos.rotulo}>Observações</Text>
-            <Text style={estilos.texto}>{paradaSelecionada.observacao || 'Sem observações'}</Text>
-          </View>
-          <Botao
-            titulo="Confirmar chegada"
-            desabilitado={paradaSelecionada.status === 'Concluída'}
-            onPress={() => setFluxo('verificar')}
-          />
-        </View>
-      </ScrollView>
-    );
-  }
-
-  if (fluxo === 'verificar') {
-    return (
-      <View style={estilos.tela}>
-        <Cabecalho titulo="Verificar presença" onVoltar={() => setFluxo('detalhe')} />
-        <View style={estilos.centro}>
-          <View style={estilos.sucessoIcone}>
-            <Text style={estilos.sucessoIconeTexto}>✓</Text>
-          </View>
-          <Text style={[estilos.titulo, estilos.textoCentral]}>Localização confirmada</Text>
-          <Text style={[estilos.subtitulo, estilos.textoCentral]}>
-            Demonstração visual. A integração com GPS real será feita na etapa de hardware.
-          </Text>
-          <View style={estilos.larguraTotalTopo18}>
-            <Botao titulo="Atualizar status" onPress={() => setFluxo('status')} />
-          </View>
-        </View>
-      </View>
-    );
-  }
-
-  if (fluxo === 'status') {
-    return (
-      <ScrollView style={estilos.tela}>
-        <Cabecalho titulo="Atualizar entrega" onVoltar={() => setFluxo('detalhe')} />
-        <View style={estilos.conteudo}>
-          {(['Em andamento', 'Concluída', 'Não realizada'] as StatusParada[]).map(item => (
-            <Pressable
-              key={item}
-              style={[estilos.opcao, statusEscolhido === item && estilos.opcaoAtiva]}
-              onPress={() => setStatusEscolhido(item)}>
-              <Text style={estilos.opcaoTexto}>{item === 'Concluída' ? 'Entregue' : item}</Text>
-            </Pressable>
-          ))}
-          {statusEscolhido === 'Não realizada' ? (
+            <TextInput style={estilos.input} value={endereco} onChangeText={setEndereco} />
+            <Text style={estilos.rotulo}>Observação</Text>
             <TextInput
               style={[estilos.input, estilos.inputMultilinha]}
-              value={motivo}
-              onChangeText={setMotivo}
+              value={observacao}
+              onChangeText={setObservacao}
               multiline
-              placeholder="Motivo da não realização"
-              placeholderTextColor="#94A3B8"
             />
-          ) : null}
-          <Botao
-            titulo="Confirmar status"
-            onPress={async () => {
-              if (statusEscolhido === 'Concluída') {
-                setFluxo('assinatura');
-                return;
-              }
-              if (await atualizarParada(statusEscolhido)) {
-                setFluxo('ativa');
-              }
-            }}
-          />
-        </View>
-      </ScrollView>
-    );
-  }
-
-  if (fluxo === 'assinatura') {
-    return (
-      <ScrollView style={estilos.tela} scrollEnabled={rolagemAtiva}>
-        <Cabecalho titulo="Assinatura do recebedor" onVoltar={() => setFluxo('status')} />
-        <View style={estilos.conteudo}>
-          <Text style={estilos.rotulo}>Nome do recebedor</Text>
-          <TextInput style={estilos.input} value={nomeRecebedor} onChangeText={setNomeRecebedor} />
-          {assinatura ? (
-            <View style={estilos.assinaturaCanvas}>
-              <Image source={{uri: assinatura}} style={estilos.assinaturaPreview} />
-            </View>
-          ) : (
-            <View style={estilos.assinaturaCanvas}>
-              <SignatureScreen
-                ref={signatureRef}
-                onOK={(sig) => setAssinatura(sig)}
-                onEmpty={() => Alert.alert('Aviso', 'Por favor, assine antes de confirmar.')}
-                onBegin={() => setRolagemAtiva(false)}
-                onEnd={() => setRolagemAtiva(true)}
-                descriptionText="Assine aqui"
-                clearText="Limpar"
-                confirmText="Salvar"
-                webStyle=".m-signature-pad--footer {display: none; margin: 0px;}"
-              />
-            </View>
-          )}
-          <Botao
-            titulo={assinatura ? "Refazer assinatura" : "Confirmar traço"}
-            secundario
-            onPress={() => {
-              if (assinatura) {
-                setAssinatura('');
-              } else {
-                signatureRef.current?.readSignature();
-              }
-            }}
-          />
-          <Botao
-            titulo="Confirmar assinatura"
-            desabilitado={!assinatura || !nomeRecebedor.trim()}
-            onPress={() => setFluxo('foto')}
-          />
-        </View>
-      </ScrollView>
-    );
-  }
-
-  if (fluxo === 'foto') {
-    return (
-      <ScrollView style={estilos.tela}>
-        <Cabecalho titulo="Foto do comprovante" onVoltar={() => setFluxo('assinatura')} />
-        <View style={estilos.conteudo}>
-          <Pressable style={estilos.foto} onPress={() => anexarFoto('camera')}>
-            {foto ? (
-              <Image source={{uri: foto}} style={estilos.fotoPreview} />
-            ) : (
-              <Text style={estilos.fotoTexto}>Toque para fotografar o comprovante</Text>
-            )}
-          </Pressable>
-          {foto ? (
-            <Botao titulo="Remover foto" secundario perigo onPress={() => setFoto('')} />
-          ) : (
-            <Botao titulo="Escolher da galeria" secundario onPress={() => anexarFoto('galeria')} />
-          )}
-          <Botao
-            titulo={enviandoEntrega ? 'Enviando...' : 'Confirmar entrega'}
-            desabilitado={!foto || enviandoEntrega}
-            onPress={confirmarEntrega}
-          />
-        </View>
-      </ScrollView>
-    );
-  }
-
-  if (fluxo === 'concluida') {
-    return (
-      <View style={estilos.centro}>
-        <View style={estilos.sucessoIcone}>
-          <Text style={estilos.sucessoIconeTexto}>✓</Text>
-        </View>
-        <Text style={[estilos.titulo, estilos.textoCentral]}>Entrega registrada</Text>
-        <Text style={[estilos.subtitulo, estilos.textoCentral]}>
-          {paradaSelecionada?.destinatario} foi marcada como concluída.
-        </Text>
-        <View style={estilos.larguraTotalTopo18}>
-          <Botao
-            titulo="Ir para próxima parada"
-            onPress={() => {
-              setAssinatura('');
-              setFoto('');
-              setNomeRecebedor('');
-              setFluxo('ativa');
-            }}
-          />
-        </View>
-      </View>
-    );
-  }
-
-  if (fluxo === 'rota' || fluxo === 'ativa') {
-    const ativa = fluxo === 'ativa' || rota.status === 'Em andamento';
-    return (
-      <View style={estilos.tela}>
-        <Cabecalho titulo={ativa ? 'Rota em andamento' : 'Minha rota'} subtitulo={`${rota.id} - ${rota.nome}`} onVoltar={() => setFluxo('base')} />
-        <ScrollView contentContainerStyle={estilos.conteudo}>
-          <View style={estilos.cardAzul}>
-            <View style={estilos.linhaEntre}>
-              <Text style={estilos.valor}>{rota.paradas.length} paradas</Text>
-              <Badge status={rota.status} />
-            </View>
-            <Text style={estilos.rotulo}>Progresso</Text>
-            <Text style={estilos.texto}>{concluidas} concluídas e {rota.paradas.length - concluidas} restantes</Text>
-            <View style={estilos.progressoFundo}>
-              <View style={[estilos.progresso, {width: `${progresso}%`}]} />
-            </View>
-          </View>
-          {rota.paradas.map((parada, indice) => (
-            <CardParada key={parada.id} parada={parada} indice={indice} onPress={() => abrirParada(parada)} />
-          ))}
-          {ativa ? (
             <Botao
-              titulo="Pausar rota"
-              secundario
+              titulo="Adicionar parada"
               onPress={async () => {
-                if (await atualizarStatusRota('Pausada')) {
-                  setFluxo('pausada');
+                if (!destinatario.trim() || !endereco.trim()) {
+                  Alert.alert('Dados incompletos', 'Informe destinatário e endereço.');
+                  return;
                 }
+                const nova: Parada = {
+                  id: Date.now().toString(),
+                  tipo,
+                  destinatario,
+                  endereco,
+                  janela: 'Parada imprevista',
+                  observacao,
+                  status: 'Pendente',
+                };
+                const salva = await onAtualizarRota({
+                  ...rota,
+                  paradas: [...rota.paradas, nova],
+                });
+
+                if (!salva) {
+                  return;
+                }
+
+                setDestinatario('');
+                setEndereco('');
+                setObservacao('');
+                setFluxo('pausada');
+                Alert.alert('Parada adicionada', 'A programação foi atualizada.');
               }}
             />
-          ) : (
+          </View>
+        </ScrollView>
+      );
+    }
+
+    if (fluxo === 'pausada') {
+      const removivel = [...rota.paradas].reverse().find(item => item.status === 'Pendente');
+      return (
+        <ScrollView style={estilos.tela}>
+          <Cabecalho titulo="Rota pausada" subtitulo="Alterações permitidas durante a pausa" />
+          <View style={estilos.conteudo}>
+            <View style={[estilos.card, {backgroundColor: cores.roxoFundo}]}>
+              <Text style={[estilos.titulo, {color: cores.roxo}]}>Pausa ativa</Text>
+              <Text style={estilos.texto}>O progresso já concluído foi preservado.</Text>
+            </View>
+            <Botao titulo="Adicionar parada" secundario onPress={() => setFluxo('adicionar')} />
             <Botao
-              titulo="Iniciar rota"
+              titulo="Remover última parada futura"
+              secundario
+              perigo
+              desabilitado={!removivel}
+              onPress={() =>
+                removivel &&
+                Alert.alert(
+                  'Remover parada',
+                  `Deseja remover ${removivel.destinatario}?`,
+                  [
+                    {text: 'Cancelar'},
+                    {
+                      text: 'Remover',
+                      onPress: async () => {
+                        await onAtualizarRota({
+                          ...rota,
+                          paradas: rota.paradas.filter(item => item.id !== removivel.id),
+                        });
+                      },
+                    },
+                  ],
+                )
+              }
+            />
+            <Botao
+              titulo="Retomar rota"
               onPress={async () => {
                 if (await atualizarStatusRota('Em andamento')) {
                   setFluxo('ativa');
                 }
               }}
             />
-          )}
+          </View>
         </ScrollView>
-      </View>
-    );
+      );
+    }
+
+    if (fluxo === 'detalhe' && paradaSelecionada) {
+      return (
+        <ScrollView style={estilos.tela}>
+          <Cabecalho titulo="Detalhes da parada" onVoltar={() => setFluxo(rota.status === 'Em andamento' ? 'ativa' : 'rota')} />
+          <View style={estilos.conteudo}>
+            <View style={estilos.card}>
+              <View style={estilos.linhaEntre}>
+                <Text style={estilos.titulo}>{paradaSelecionada.tipo}</Text>
+                <Badge status={paradaSelecionada.status} />
+              </View>
+              <Text style={estilos.rotulo}>Cliente ou destinatário</Text>
+              <Text style={estilos.valor}>{paradaSelecionada.destinatario}</Text>
+              <Text style={estilos.rotulo}>Endereço</Text>
+              <Text style={estilos.texto}>{paradaSelecionada.endereco}</Text>
+              <Text style={estilos.rotulo}>Janela de atendimento</Text>
+              <Text style={estilos.texto}>{paradaSelecionada.janela}</Text>
+              <Text style={estilos.rotulo}>Observações</Text>
+              <Text style={estilos.texto}>{paradaSelecionada.observacao || 'Sem observações'}</Text>
+            </View>
+            <Botao
+              titulo="Confirmar chegada"
+              desabilitado={paradaSelecionada.status === 'Concluída'}
+              onPress={() => setFluxo('verificar')}
+            />
+          </View>
+        </ScrollView>
+      );
+    }
+
+    if (fluxo === 'verificar') {
+      return (
+        <View style={estilos.tela}>
+          <Cabecalho titulo="Verificar presença" onVoltar={() => setFluxo('detalhe')} />
+          <View style={estilos.centro}>
+            <View style={estilos.sucessoIcone}>
+              <Text style={estilos.sucessoIconeTexto}>✓</Text>
+            </View>
+            <Text style={[estilos.titulo, estilos.textoCentral]}>Localização confirmada</Text>
+            <Text style={[estilos.subtitulo, estilos.textoCentral]}>
+              Demonstração visual. A integração com GPS real será feita na etapa de hardware.
+            </Text>
+            <View style={estilos.larguraTotalTopo18}>
+              <Botao titulo="Atualizar status" onPress={() => setFluxo('status')} />
+            </View>
+          </View>
+        </View>
+      );
+    }
+
+    if (fluxo === 'status') {
+      return (
+        <ScrollView style={estilos.tela}>
+          <Cabecalho titulo="Atualizar entrega" onVoltar={() => setFluxo('detalhe')} />
+          <View style={estilos.conteudo}>
+            {(['Em andamento', 'Concluída', 'Não realizada'] as StatusParada[]).map(item => (
+              <Pressable
+                key={item}
+                style={[estilos.opcao, statusEscolhido === item && estilos.opcaoAtiva]}
+                onPress={() => setStatusEscolhido(item)}>
+                <Text style={estilos.opcaoTexto}>{item === 'Concluída' ? 'Entregue' : item}</Text>
+              </Pressable>
+            ))}
+            {statusEscolhido === 'Não realizada' ? (
+              <TextInput
+                style={[estilos.input, estilos.inputMultilinha]}
+                value={motivo}
+                onChangeText={setMotivo}
+                multiline
+                placeholder="Motivo da não realização"
+                placeholderTextColor="#94A3B8"
+              />
+            ) : null}
+            <Botao
+              titulo="Confirmar status"
+              onPress={async () => {
+                if (statusEscolhido === 'Concluída') {
+                  setFluxo('assinatura');
+                  return;
+                }
+                if (await atualizarParada(statusEscolhido)) {
+                  setFluxo('ativa');
+                }
+              }}
+            />
+          </View>
+        </ScrollView>
+      );
+    }
+
+    if (fluxo === 'assinatura') {
+      return (
+        <ScrollView style={estilos.tela} scrollEnabled={rolagemAtiva}>
+          <Cabecalho titulo="Assinatura do recebedor" onVoltar={() => setFluxo('status')} />
+          <View style={estilos.conteudo}>
+            <Text style={estilos.rotulo}>Nome do recebedor</Text>
+            <TextInput style={estilos.input} value={nomeRecebedor} onChangeText={setNomeRecebedor} />
+            {assinatura ? (
+              <View style={estilos.assinaturaCanvas}>
+                <Image source={{uri: assinatura}} style={estilos.assinaturaPreview} />
+              </View>
+            ) : (
+              <View style={estilos.assinaturaCanvas}>
+                <SignatureScreen
+                  ref={signatureRef}
+                  onOK={(sig) => setAssinatura(sig)}
+                  onEmpty={() => Alert.alert('Aviso', 'Por favor, assine antes de confirmar.')}
+                  onBegin={() => setRolagemAtiva(false)}
+                  onEnd={() => setRolagemAtiva(true)}
+                  descriptionText="Assine aqui"
+                  clearText="Limpar"
+                  confirmText="Salvar"
+                  webStyle=".m-signature-pad--footer {display: none; margin: 0px;}"
+                />
+              </View>
+            )}
+            <Botao
+              titulo={assinatura ? "Refazer assinatura" : "Confirmar traço"}
+              secundario
+              onPress={() => {
+                if (assinatura) {
+                  setAssinatura('');
+                } else {
+                  signatureRef.current?.readSignature();
+                }
+              }}
+            />
+            <Botao
+              titulo="Confirmar assinatura"
+              desabilitado={!assinatura || !nomeRecebedor.trim()}
+              onPress={() => setFluxo('foto')}
+            />
+          </View>
+        </ScrollView>
+      );
+    }
+
+    if (fluxo === 'foto') {
+      return (
+        <ScrollView style={estilos.tela}>
+          <Cabecalho titulo="Foto do comprovante" onVoltar={() => setFluxo('assinatura')} />
+          <View style={estilos.conteudo}>
+            <Pressable style={estilos.foto} onPress={() => anexarFoto('camera')}>
+              {foto ? (
+                <Image source={{uri: foto}} style={estilos.fotoPreview} />
+              ) : (
+                <Text style={estilos.fotoTexto}>Toque para fotografar o comprovante</Text>
+              )}
+            </Pressable>
+            {foto ? (
+              <Botao titulo="Remover foto" secundario perigo onPress={() => setFoto('')} />
+            ) : (
+              <Botao titulo="Escolher da galeria" secundario onPress={() => anexarFoto('galeria')} />
+            )}
+            <Botao
+              titulo={enviandoEntrega ? 'Enviando...' : 'Confirmar entrega'}
+              desabilitado={!foto || enviandoEntrega}
+              onPress={confirmarEntrega}
+            />
+          </View>
+        </ScrollView>
+      );
+    }
+
+    if (fluxo === 'concluida') {
+      return (
+        <View style={estilos.centro}>
+          <View style={estilos.sucessoIcone}>
+            <Text style={estilos.sucessoIconeTexto}>✓</Text>
+          </View>
+          <Text style={[estilos.titulo, estilos.textoCentral]}>Entrega registrada</Text>
+          <Text style={[estilos.subtitulo, estilos.textoCentral]}>
+            {paradaSelecionada?.destinatario} foi marcada como concluída.
+          </Text>
+          <View style={estilos.larguraTotalTopo18}>
+            <Botao
+              titulo="Ir para próxima parada"
+              onPress={() => {
+                setAssinatura('');
+                setFoto('');
+                setNomeRecebedor('');
+                setFluxo('ativa');
+              }}
+            />
+          </View>
+        </View>
+      );
+    }
+
+    if (fluxo === 'rota' || fluxo === 'ativa') {
+      const ativa = fluxo === 'ativa' || rota.status === 'Em andamento';
+      return (
+        <View style={estilos.tela}>
+          <Cabecalho titulo={ativa ? 'Rota em andamento' : 'Minha rota'} subtitulo={`${rota.id} - ${rota.nome}`} onVoltar={voltarParaHoje} />
+          <ScrollView contentContainerStyle={estilos.conteudo}>
+            <View style={estilos.cardAzul}>
+              <View style={estilos.linhaEntre}>
+                <Text style={estilos.valor}>{rota.paradas.length} paradas</Text>
+                <Badge status={rota.status} />
+              </View>
+              <Text style={estilos.rotulo}>Progresso</Text>
+              <Text style={estilos.texto}>{concluidas} concluídas e {rota.paradas.length - concluidas} restantes</Text>
+              <View style={estilos.progressoFundo}>
+                <View style={[estilos.progresso, {width: `${progresso}%`}]} />
+              </View>
+            </View>
+            {rota.paradas.map((parada, indice) => (
+              <CardParada key={parada.id} parada={parada} indice={indice} onPress={() => abrirParada(parada)} />
+            ))}
+            {ativa ? (
+              <Botao
+                titulo="Pausar rota"
+                secundario
+                onPress={async () => {
+                  if (await atualizarStatusRota('Pausada')) {
+                    setFluxo('pausada');
+                  }
+                }}
+              />
+            ) : (
+              <Botao
+                titulo="Iniciar rota"
+                onPress={async () => {
+                  if (await atualizarStatusRota('Em andamento')) {
+                    setFluxo('ativa');
+                  }
+                }}
+              />
+            )}
+          </ScrollView>
+        </View>
+      );
+    }
+    return null;
   }
 
   function conteudoBase() {
@@ -533,76 +571,174 @@ export function TelaMotorista({rota, onAtualizarRota, onSair}: Props) {
       );
     }
 
-    if (aba === 'Perfil') {
-      return (
-        <>
-          <Text style={estilos.titulo}>Perfil</Text>
-          <View style={estilos.card}>
-            <Text style={estilos.valor}>Carlos Mendes</Text>
-            <Text style={estilos.texto}>Motorista</Text>
-            <View style={estilos.separador} />
-            <Text style={estilos.rotulo}>Veículo</Text>
-            <Text style={estilos.texto}>Mercedes-Benz Sprinter - ABC-1234</Text>
-            <Text style={estilos.rotulo}>CNH</Text>
-            <Text style={estilos.texto}>Categoria C - válida</Text>
-          </View>
-          <Botao titulo="Sair da conta" secundario perigo onPress={onSair} />
-        </>
-      );
-    }
+    return null;
+  }
 
-    if (aba === 'Minha rota') {
-      return null;
-    }
-
+  function conteudoPerfil() {
     return (
-      <>
-        <Text style={estilos.titulo}>Olá, Carlos</Text>
-        <Text style={estilos.subtitulo}>Confira sua jornada programada.</Text>
-        <View style={[estilos.grade, estilos.margemTopo18]}>
-          <View style={estilos.metrica}>
-            <Text style={estilos.metricaNumero}>{rota.paradas.length}</Text>
-            <Text style={estilos.metricaTexto}>Paradas</Text>
+      <LayoutFaixa
+        faixa={
+          <View style={estilos.perfilCabecalho}>
+            <View style={estilos.perfilAvatar} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+              <Text style={estilos.perfilIniciais}>{iniciais(usuario.nome)}</Text>
+            </View>
+            <View style={estilos.flex}>
+              <Text style={estilos.perfilNome} accessibilityRole="header">
+                {usuario.nome}
+              </Text>
+              <Text style={estilos.loginSlogan}>{NOME_PAPEL[usuario.papel]}</Text>
+            </View>
           </View>
-          <View style={estilos.metrica}>
-            <Text style={estilos.metricaNumero}>{concluidas}</Text>
-            <Text style={estilos.metricaTexto}>Concluídas</Text>
-          </View>
-          <View style={estilos.metrica}>
-            <Text style={estilos.metricaNumero}>{rota.horario}</Text>
-            <Text style={estilos.metricaTexto}>Início previsto</Text>
-          </View>
-          <View style={estilos.metrica}>
-            <Text style={estilos.metricaNumero}>{rota.status === 'Concluída' ? '100%' : `${Math.round(progresso)}%`}</Text>
-            <Text style={estilos.metricaTexto}>Progresso</Text>
+        }>
+        <Text style={estilos.secaoRotulo}>Conta</Text>
+        <View style={estilos.perfilLinha}>
+          <MaterialDesignIcons name="email-outline" size={24} color={cores.textoApoio} />
+          <View style={estilos.flex}>
+            <Text style={estilos.metricaRotulo}>E-mail</Text>
+            <Text style={estilos.perfilValor}>{usuario.email}</Text>
           </View>
         </View>
-        <Text style={estilos.tituloSecao}>Rota do dia</Text>
-        <Pressable style={estilos.cardAzul} onPress={() => setFluxo('rota')}>
-          <View style={estilos.linhaEntre}>
-            <Text style={estilos.valor}>{rota.id}</Text>
-            <Badge status={rota.status} />
+        <View style={estilos.perfilSeparador} />
+        <View style={estilos.perfilLinha}>
+          <MaterialDesignIcons name="badge-account-outline" size={24} color={cores.textoApoio} />
+          <View style={estilos.flex}>
+            <Text style={estilos.metricaRotulo}>Papel</Text>
+            <Text style={estilos.perfilValor}>{NOME_PAPEL[usuario.papel]}</Text>
           </View>
-          <Text style={[estilos.valor, estilos.margemTopo10]}>{rota.nome}</Text>
-          <Text style={estilos.texto}>{rota.paradas.length} paradas - início às {rota.horario}</Text>
-        </Pressable>
-        <Botao titulo="Ver minha rota" onPress={() => setFluxo('rota')} />
-      </>
+        </View>
+
+        <BotaoContornado titulo="Sair da conta" icone="logout" perigo onPress={onSair} />
+        <View style={estilos.perfilRodape}>
+          <MaterialDesignIcons name="information-outline" size={16} color={cores.textoApoio} />
+          <Text style={estilos.perfilRodapeTexto}>Versão de demonstração · Sprint 1</Text>
+        </View>
+      </LayoutFaixa>
     );
   }
 
+  function conteudoHoje() {
+    // Só para exibição: a primeira parada que ainda não foi finalizada.
+    const proximaParada = rota.paradas.find(
+      item => item.status !== 'Concluída' && item.status !== 'Não realizada',
+    );
+    const percentual = rota.status === 'Concluída' ? 100 : Math.round(progresso);
+    const restantes = rota.paradas.length - concluidas;
+
+    return (
+      <LayoutFaixa
+        faixa={
+          <>
+            <Text style={estilos.loginMarca} accessibilityRole="header">
+              Olá, {primeiroNome(usuario.nome)}
+            </Text>
+            <Text style={estilos.loginSlogan}>Confira sua jornada de hoje.</Text>
+          </>
+        }>
+        <Text style={estilos.secaoRotulo}>Rota do dia</Text>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Rota do dia: ${rota.nome}`}
+          onPress={() => setFluxo('rota')}
+          style={({pressed}) => [estilos.cartao, pressed && estilos.cartaoPressionado]}>
+          <View style={estilos.linhaEntre}>
+            <Text style={estilos.cartaoTitulo}>{rota.nome}</Text>
+            <Badge status={rota.status} />
+          </View>
+          <View style={estilos.linhaIcone}>
+            <MaterialDesignIcons name="clock-outline" size={16} color={cores.textoApoio} />
+            <Text style={estilos.textoApoio}>
+              {rota.id} · início às {rota.horario}
+            </Text>
+          </View>
+          <View style={estilos.progressoLinha}>
+            <Text style={estilos.progressoPercentual}>{percentual}%</Text>
+            <Text style={estilos.textoApoio}>
+              {concluidas} de {rota.paradas.length} paradas concluídas
+            </Text>
+          </View>
+          <View style={estilos.progressoFundo}>
+            <View style={[estilos.progresso, {width: `${percentual}%`}]} />
+          </View>
+          <View style={estilos.metricasLinha}>
+            <View style={estilos.metricaItem}>
+              <Text style={estilos.metricaValor}>{rota.paradas.length}</Text>
+              <Text style={estilos.metricaRotulo}>Paradas</Text>
+            </View>
+            <View style={estilos.metricaDivisor} />
+            <View style={estilos.metricaItem}>
+              <Text style={estilos.metricaValor}>{concluidas}</Text>
+              <Text style={estilos.metricaRotulo}>Concluídas</Text>
+            </View>
+            <View style={estilos.metricaDivisor} />
+            <View style={estilos.metricaItem}>
+              <Text style={estilos.metricaValor}>{restantes}</Text>
+              <Text style={estilos.metricaRotulo}>Restantes</Text>
+            </View>
+          </View>
+        </Pressable>
+
+        <Text style={[estilos.secaoRotulo, estilos.secaoRotuloAfastado]}>Próxima parada</Text>
+        {proximaParada ? (
+          <View style={estilos.cartaoParada}>
+            <Text style={estilos.paradaContexto}>
+              Parada {rota.paradas.indexOf(proximaParada) + 1} de {rota.paradas.length} ·{' '}
+              {proximaParada.tipo}
+            </Text>
+            <Text style={estilos.paradaDestinatario}>{proximaParada.destinatario}</Text>
+            <Text style={estilos.paradaEndereco}>{proximaParada.endereco}</Text>
+            <View style={estilos.paradaJanela}>
+              <MaterialDesignIcons name="clock-outline" size={18} color={cores.textoApoio} />
+              <Text style={estilos.textoApoio}>Janela {proximaParada.janela}</Text>
+            </View>
+            <BotaoPrincipal
+              titulo="Abrir parada"
+              onPress={() => abrirParada(proximaParada)}
+            />
+          </View>
+        ) : (
+          <View style={estilos.cartaoParada}>
+            <View style={estilos.linhaIcone}>
+              <MaterialDesignIcons name="flag-checkered" size={20} color={cores.sucesso} />
+              <Text style={estilos.textoApoioForte}>Todas as paradas foram finalizadas.</Text>
+            </View>
+          </View>
+        )}
+
+        <BotaoContornado titulo="Ver minha rota" onPress={() => setFluxo('rota')} />
+      </LayoutFaixa>
+    );
+  }
+
+  function conteudoAba() {
+    if (aba === 'Perfil') {
+      return conteudoPerfil();
+    }
+    if (aba === 'Notificações') {
+      return (
+        <>
+          <Cabecalho titulo="RotaMestre" subtitulo="Área do Motorista" />
+          <ScrollView contentContainerStyle={estilos.conteudo}>{conteudoBase()}</ScrollView>
+        </>
+      );
+    }
+    return conteudoHoje();
+  }
+
+  const tela = telaDoFluxo();
+  if (tela && FLUXOS_TELA_CHEIA.includes(fluxo)) {
+    return <TransicaoEntrada key={fluxo}>{tela}</TransicaoEntrada>;
+  }
+
+  // Lista, detalhe e pausa da rota ficam sob a aba "Minha rota", mesmo quando abertos pela Hoje.
+  const abaDestacada: Aba = tela ? 'Minha rota' : aba;
+  // A `key` recria a transição a cada troca de tela. "rota" e "ativa" são a mesma tela: não repete o fade.
+  const chaveTela = tela ? (fluxo === 'ativa' ? 'rota' : fluxo) : aba;
+
   return (
-    <View style={estilos.tela}>
+    <View style={estilos.telaComNavegacao}>
       <StatusBar barStyle="light-content" />
-      <Cabecalho titulo="RotaMestre" subtitulo="Área do Motorista" />
-      <ScrollView contentContainerStyle={estilos.conteudo}>
-        {conteudoBase()}
-      </ScrollView>
-      <Abas
-        itens={['Hoje', 'Minha rota', 'Notificações', 'Perfil']}
-        ativa={aba}
-        onPress={trocarAba}
-      />
+      <TransicaoEntrada key={chaveTela}>{tela ?? conteudoAba()}</TransicaoEntrada>
+      <NavegacaoInferior itens={ITENS_NAVEGACAO} ativa={abaDestacada} onPress={trocarAba} />
     </View>
   );
 }

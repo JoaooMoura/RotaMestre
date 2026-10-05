@@ -23,6 +23,10 @@ export const cores = {
   textoApoio: '#475569',
   contorno: '#64748B',
   erro: '#B91C1C',
+  // Acento "Sinal" (design system, S1): reservado para "o que fazer agora". Nunca para erro.
+  acento: '#F97316',
+  acentoTexto: '#C2410C',
+  acentoClaro: '#FFEDD5',
 };
 
 export const estilos = StyleSheet.create({
@@ -463,4 +467,170 @@ export const estilos = StyleSheet.create({
     lineHeight: 24,
     fontWeight: '600',
   },
+  botaoConteudo: {flexDirection: 'row', alignItems: 'center', gap: 8},
+  botaoContornadoPerigo: {borderColor: cores.contorno},
+  botaoContornadoPerigoPressionado: {backgroundColor: cores.perigoFundo},
+  botaoContornadoPerigoTexto: {color: cores.erro},
+
+  // Navigation Bar do MD3: 80dp (12 + pílula 32 + 4 + rótulo 16 + 16) + margem do sistema.
+  navegacao: {
+    flexDirection: 'row',
+    backgroundColor: cores.card,
+    borderTopWidth: 1,
+    borderTopColor: cores.borda,
+    paddingTop: 12,
+  },
+  navegacaoItem: {flex: 1, minHeight: 52, alignItems: 'center', gap: 4},
+  navegacaoItemPressionado: {opacity: 0.6},
+  // Indicador ativo: pílula 64x32 atrás do ícone (a aba ativa não depende só da cor).
+  navegacaoIndicador: {
+    width: 64,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  navegacaoIndicadorAtivo: {backgroundColor: cores.primariaClara},
+  navegacaoRotulo: {
+    color: cores.textoApoio,
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: '500',
+  },
+  navegacaoRotuloAtivo: {color: cores.textoForte, fontWeight: '600'},
+
+  // Área logada: seções, cards e métricas sobre a folha branca.
+  telaComNavegacao: {flex: 1, backgroundColor: cores.card},
+  // Fundo opaco atrás das transições (evita revelar o azul da área segura no fade).
+  fundoTransicao: {flex: 1, backgroundColor: cores.card},
+  secaoRotulo: {
+    color: cores.textoForte,
+    fontSize: 18,
+    lineHeight: 24,
+    fontWeight: '600',
+    marginBottom: 12,
+  },
+  secaoRotuloAfastado: {marginTop: 32},
+  cartao: {
+    backgroundColor: cores.card,
+    borderWidth: 1,
+    borderColor: cores.borda,
+    borderRadius: 16,
+    padding: 16,
+  },
+  cartaoPressionado: {backgroundColor: cores.fundo},
+  // Próxima parada: superfície preenchida, sem borda, com o endereço como informação principal.
+  cartaoParada: {backgroundColor: '#F1F5F9', borderRadius: 20, padding: 20},
+  paradaContexto: {
+    color: cores.textoApoio,
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: '500',
+  },
+  paradaDestinatario: {
+    color: cores.textoForte,
+    fontSize: 22,
+    lineHeight: 28,
+    fontWeight: '700',
+    marginTop: 4,
+  },
+  paradaEndereco: {
+    color: cores.textoForte,
+    fontSize: 16,
+    lineHeight: 24,
+    marginTop: 2,
+  },
+  paradaJanela: {flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 12},
+  cartaoTitulo: {
+    flex: 1,
+    color: cores.textoForte,
+    fontSize: 20,
+    lineHeight: 28,
+    fontWeight: '600',
+    marginRight: 12,
+  },
+  textoApoio: {color: cores.textoApoio, fontSize: 14, lineHeight: 20},
+  textoApoioForte: {
+    color: cores.textoApoio,
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: '500',
+  },
+  linhaIcone: {flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4},
+  progressoLinha: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 8,
+    marginTop: 16,
+  },
+  progressoPercentual: {
+    color: cores.primaria,
+    fontSize: 32,
+    lineHeight: 40,
+    fontWeight: '700',
+  },
+  metricasLinha: {
+    flexDirection: 'row',
+    borderTopWidth: 1,
+    borderTopColor: cores.borda,
+    marginTop: 16,
+    paddingTop: 12,
+  },
+  metricaItem: {flex: 1},
+  metricaDivisor: {width: 1, backgroundColor: cores.borda, marginHorizontal: 12},
+  metricaValor: {
+    color: cores.textoForte,
+    fontSize: 20,
+    lineHeight: 28,
+    fontWeight: '700',
+  },
+  metricaRotulo: {color: cores.textoApoio, fontSize: 12, lineHeight: 16},
+  iconeCirculo: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: cores.primariaClara,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+
+  // Perfil: avatar com iniciais e linhas de informação.
+  perfilCabecalho: {flexDirection: 'row', alignItems: 'center', gap: 16},
+  perfilAvatar: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  perfilIniciais: {
+    color: cores.primaria,
+    fontSize: 24,
+    lineHeight: 32,
+    fontWeight: '700',
+  },
+  perfilNome: {
+    color: '#FFFFFF',
+    fontSize: 24,
+    lineHeight: 32,
+    fontWeight: '700',
+  },
+  perfilLinha: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+    minHeight: 64,
+    paddingVertical: 8,
+  },
+  perfilSeparador: {height: 1, backgroundColor: cores.borda, marginLeft: 40},
+  perfilValor: {color: cores.textoForte, fontSize: 16, lineHeight: 24},
+  perfilRodape: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 24,
+  },
+  perfilRodapeTexto: {color: cores.textoApoio, fontSize: 12, lineHeight: 16},
 });

@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import {MaterialDesignIcons} from '@react-native-vector-icons/material-design-icons';
 import MaskInput, {Mask, Masks} from 'react-native-mask-input';
+import {BotaoContornado, BotaoPrincipal, BotaoTexto, NomeIcone} from '../componentes';
 import {cores, estilos} from '../estilos';
 import {cadastrarMotorista} from '../servicos/api';
 import {useSessao} from '../viewmodels/SessaoViewModel';
@@ -24,8 +25,6 @@ type Etapa =
   | 'cadastro2'
   | 'cadastro3'
   | 'concluido';
-
-type NomeIcone = React.ComponentProps<typeof MaterialDesignIcons>['name'];
 
 const TOTAL_ETAPAS_CADASTRO = 3;
 
@@ -377,15 +376,7 @@ export function TelaAutenticacao() {
         <Text style={estilos.loginDivisorTexto}>Novo por aqui?</Text>
         <View style={estilos.loginDivisorLinha} />
       </View>
-      <Pressable
-        accessibilityRole="button"
-        onPress={() => setEtapa('cadastro1')}
-        style={({pressed}) => [
-          estilos.loginBotaoContornado,
-          pressed && estilos.loginBotaoContornadoPressionado,
-        ]}>
-        <Text style={estilos.loginBotaoContornadoTexto}>Criar conta de motorista</Text>
-      </Pressable>
+      <BotaoContornado titulo="Criar conta de motorista" onPress={() => setEtapa('cadastro1')} />
     </LayoutAutenticacao>
   );
 }
@@ -522,35 +513,5 @@ function Campo({rotulo, icone, mascara, acao, estiloTexto, onFocus, onBlur, ...p
         {acao}
       </View>
     </>
-  );
-}
-
-type BotaoAutenticacaoProps = {
-  titulo: string;
-  onPress: () => void;
-  desabilitado?: boolean;
-};
-
-function BotaoPrincipal({titulo, onPress, desabilitado}: BotaoAutenticacaoProps) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      disabled={desabilitado}
-      onPress={onPress}
-      style={({pressed}) => [
-        estilos.loginBotao,
-        pressed && estilos.loginBotaoPressionado,
-        desabilitado && estilos.botaoDesabilitado,
-      ]}>
-      <Text style={estilos.loginBotaoTexto}>{titulo}</Text>
-    </Pressable>
-  );
-}
-
-function BotaoTexto({titulo, onPress}: BotaoAutenticacaoProps) {
-  return (
-    <Pressable style={estilos.loginLink} onPress={onPress} accessibilityRole="button">
-      <Text style={estilos.loginLinkTexto}>{titulo}</Text>
-    </Pressable>
   );
 }
