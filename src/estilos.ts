@@ -293,6 +293,33 @@ export const estilos = StyleSheet.create({
   loginRolagem: {flex: 1, backgroundColor: cores.primaria},
   loginRolagemConteudo: {flexGrow: 1},
   loginFaixa: {paddingHorizontal: 24, paddingTop: 40, paddingBottom: 56},
+  loginFaixaComVoltar: {paddingTop: 8},
+  loginVoltar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    marginLeft: -12,
+    marginBottom: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loginVoltarPressionado: {backgroundColor: 'rgba(255, 255, 255, 0.16)'},
+  // Indicador de etapas do cadastro, desenhado sobre a faixa azul.
+  loginProgresso: {flexDirection: 'row', gap: 6, marginTop: 20},
+  loginProgressoSegmento: {
+    flex: 1,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: 'rgba(255, 255, 255, 0.35)',
+  },
+  loginProgressoSegmentoAtivo: {backgroundColor: '#FFFFFF'},
+  loginProgressoTexto: {
+    color: cores.textoSobrePrimaria,
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: '500',
+    marginTop: 8,
+  },
   loginMarcaLinha: {flexDirection: 'row', alignItems: 'center', gap: 12},
   loginMarca: {
     color: '#FFFFFF',
@@ -359,6 +386,7 @@ export const estilos = StyleSheet.create({
     paddingVertical: 0,
   },
   loginCampoTextoSemAcao: {marginRight: 16},
+  loginCampoCodigo: {fontSize: 22, fontWeight: '600', letterSpacing: 6},
   loginAcaoCampo: {
     width: 48,
     height: 48,
@@ -382,6 +410,9 @@ export const estilos = StyleSheet.create({
     lineHeight: 20,
     fontWeight: '500',
   },
+  // Variante informativa da faixa de erro (ex.: aviso de demonstração).
+  loginAviso: {backgroundColor: cores.primariaClara, marginTop: 0},
+  loginAvisoTexto: {color: cores.primariaPressionada},
   loginBotao: {
     minHeight: 56,
     borderRadius: 28,
