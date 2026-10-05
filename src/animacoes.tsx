@@ -1,5 +1,3 @@
-// Animações curtas de interface (só aparência): entrada de tela e toque em botão.
-// Tudo roda no driver nativo (opacity/transform), sem recalcular layout a cada quadro.
 import React, {useEffect, useRef} from 'react';
 import {AccessibilityInfo, Animated, Easing, View} from 'react-native';
 import {estilos} from './estilos';
@@ -8,8 +6,6 @@ const DURACAO_ENTRADA = 160;
 const DESLOCAMENTO_ENTRADA = 8;
 const ESCALA_PRESSIONADO = 0.97;
 
-// "Remover animações" do Android: lido uma vez e atualizado por evento,
-// para a animação começar no mesmo quadro da montagem (sem esperar uma chamada assíncrona).
 let reduzirMovimento = false;
 AccessibilityInfo.isReduceMotionEnabled()
   .then(valor => {
@@ -24,7 +20,6 @@ type TransicaoEntradaProps = {
   children: React.ReactNode;
 };
 
-// Tela nova entra com fade curto e leve subida. Use com `key` para repetir a cada troca de tela.
 export function TransicaoEntrada({children}: TransicaoEntradaProps) {
   const progresso = useRef(new Animated.Value(reduzirMovimento ? 1 : 0)).current;
 
@@ -47,7 +42,6 @@ export function TransicaoEntrada({children}: TransicaoEntradaProps) {
 
   const estiloAnimado = {opacity: progresso, transform: [{translateY}]};
 
-  // Fundo fixo atrás da camada animada: durante o fade aparece branco, não o azul da área segura.
   return (
     <View style={estilos.fundoTransicao}>
       <Animated.View style={[estilos.flex, estiloAnimado]}>{children}</Animated.View>
@@ -55,7 +49,6 @@ export function TransicaoEntrada({children}: TransicaoEntradaProps) {
   );
 }
 
-// Botão "afunda" levemente ao toque e volta com mola.
 export function useEscalaAoPressionar() {
   const escala = useRef(new Animated.Value(1)).current;
 

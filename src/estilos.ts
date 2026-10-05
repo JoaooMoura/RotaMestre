@@ -16,14 +16,12 @@ export const cores = {
   perigoFundo: '#FEE2E2',
   roxo: '#7E22CE',
   roxoFundo: '#F3E8FF',
-  // Papéis do Material Design 3 com contraste alto (uso sob sol forte).
   primariaPressionada: '#1E40AF',
   textoSobrePrimaria: '#DBEAFE',
   textoForte: '#0F172A',
   textoApoio: '#475569',
   contorno: '#64748B',
   erro: '#B91C1C',
-  // Acento "Sinal" (design system, S1): reservado para "o que fazer agora". Nunca para erro.
   acento: '#F97316',
   acentoTexto: '#C2410C',
   acentoClaro: '#FFEDD5',
@@ -293,7 +291,6 @@ export const estilos = StyleSheet.create({
   margemTopo10: {marginTop: 10},
   margemTopo18: {marginTop: 18},
 
-  // Tela de login (Material Design 3): faixa da marca + folha do formulário.
   loginRolagem: {flex: 1, backgroundColor: cores.primaria},
   loginRolagemConteudo: {flexGrow: 1},
   loginFaixa: {paddingHorizontal: 24, paddingTop: 40, paddingBottom: 56},
@@ -308,7 +305,6 @@ export const estilos = StyleSheet.create({
     justifyContent: 'center',
   },
   loginVoltarPressionado: {backgroundColor: 'rgba(255, 255, 255, 0.16)'},
-  // Indicador de etapas do cadastro, desenhado sobre a faixa azul.
   loginProgresso: {flexDirection: 'row', gap: 6, marginTop: 20},
   loginProgressoSegmento: {
     flex: 1,
@@ -379,7 +375,6 @@ export const estilos = StyleSheet.create({
     borderRadius: 12,
     paddingLeft: 16,
   },
-  // Borda de 2dp no foco; o padding compensa para o conteúdo não pular.
   loginCampoFocado: {borderWidth: 2, borderColor: cores.primaria, paddingLeft: 15},
   loginCampoTexto: {
     flex: 1,
@@ -414,7 +409,6 @@ export const estilos = StyleSheet.create({
     lineHeight: 20,
     fontWeight: '500',
   },
-  // Variante informativa da faixa de erro (ex.: aviso de demonstração).
   loginAviso: {backgroundColor: cores.primariaClara, marginTop: 0},
   loginAvisoTexto: {color: cores.primariaPressionada},
   loginBotao: {
@@ -472,7 +466,6 @@ export const estilos = StyleSheet.create({
   botaoContornadoPerigoPressionado: {backgroundColor: cores.perigoFundo},
   botaoContornadoPerigoTexto: {color: cores.erro},
 
-  // Navigation Bar do MD3: 80dp (12 + pílula 32 + 4 + rótulo 16 + 16) + margem do sistema.
   navegacao: {
     flexDirection: 'row',
     backgroundColor: cores.card,
@@ -482,7 +475,6 @@ export const estilos = StyleSheet.create({
   },
   navegacaoItem: {flex: 1, minHeight: 52, alignItems: 'center', gap: 4},
   navegacaoItemPressionado: {opacity: 0.6},
-  // Indicador ativo: pílula 64x32 atrás do ícone (a aba ativa não depende só da cor).
   navegacaoIndicador: {
     width: 64,
     height: 32,
@@ -499,9 +491,7 @@ export const estilos = StyleSheet.create({
   },
   navegacaoRotuloAtivo: {color: cores.textoForte, fontWeight: '600'},
 
-  // Área logada: seções, cards e métricas sobre a folha branca.
   telaComNavegacao: {flex: 1, backgroundColor: cores.card},
-  // Fundo opaco atrás das transições (evita revelar o azul da área segura no fade).
   fundoTransicao: {flex: 1, backgroundColor: cores.card},
   secaoRotulo: {
     color: cores.textoForte,
@@ -519,7 +509,6 @@ export const estilos = StyleSheet.create({
     padding: 16,
   },
   cartaoPressionado: {backgroundColor: cores.fundo},
-  // Próxima parada: superfície preenchida, sem borda, com o endereço como informação principal.
   cartaoParada: {backgroundColor: '#F1F5F9', borderRadius: 20, padding: 20},
   paradaContexto: {
     color: cores.textoApoio,
@@ -595,7 +584,6 @@ export const estilos = StyleSheet.create({
     marginBottom: 16,
   },
 
-  // Perfil: avatar com iniciais e linhas de informação.
   perfilCabecalho: {flexDirection: 'row', alignItems: 'center', gap: 16},
   perfilAvatar: {
     width: 64,
@@ -633,4 +621,87 @@ export const estilos = StyleSheet.create({
     marginTop: 24,
   },
   perfilRodapeTexto: {color: cores.textoApoio, fontSize: 12, lineHeight: 16},
+
+  linhaLista: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    minHeight: 64,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: cores.borda,
+  },
+  linhaListaTitulo: {
+    color: cores.textoForte,
+    fontSize: 16,
+    lineHeight: 24,
+    fontWeight: '600',
+  },
+  avatarPequeno: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: cores.primariaClara,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarPequenoTexto: {
+    color: cores.primariaPressionada,
+    fontSize: 16,
+    lineHeight: 24,
+    fontWeight: '600',
+  },
+  etiqueta: {flexDirection: 'row', alignItems: 'center', gap: 4},
+  etiquetaTexto: {fontSize: 12, lineHeight: 16, fontWeight: '600'},
+  etiquetaPrimaria: {color: cores.primaria},
+  etiquetaSucesso: {color: cores.sucesso},
+  etiquetaNeutra: {color: cores.textoApoio},
+  opcaoLista: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    minHeight: 72,
+    borderWidth: 1,
+    borderColor: cores.borda,
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginBottom: 12,
+  },
+  opcaoListaSelecionada: {
+    borderWidth: 2,
+    borderColor: cores.primaria,
+    backgroundColor: '#F5F8FF',
+    paddingHorizontal: 15,
+    paddingVertical: 11,
+  },
+  seletorTipo: {flexDirection: 'row', gap: 12, marginTop: 16},
+  seletorOpcao: {
+    flex: 1,
+    minHeight: 48,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    borderWidth: 1,
+    borderColor: cores.contorno,
+    borderRadius: 24,
+    paddingHorizontal: 12,
+  },
+  seletorOpcaoAtiva: {borderColor: cores.primaria, backgroundColor: cores.primariaClara},
+  seletorTexto: {
+    color: cores.textoForte,
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: '600',
+  },
+  campoMultilinha: {minHeight: 96, textAlignVertical: 'top', paddingTop: 16},
+  vazio: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#F1F5F9',
+    borderRadius: 16,
+    padding: 16,
+  },
 });

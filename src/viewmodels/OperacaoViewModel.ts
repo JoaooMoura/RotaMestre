@@ -2,7 +2,6 @@ import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import * as api from '../servicos/api';
 import {Motorista, Rota, Usuario} from '../tipos';
 
-// Dependência injetada: hoje a API; na Sprint 2, um repositório com cache SQLite no mesmo formato.
 export type ServicoOperacao = {
   buscarRotaAtual: () => Promise<Rota | null>;
   buscarMotoristas: () => Promise<Motorista[]>;
@@ -15,14 +14,12 @@ export const servicoOperacaoApi: ServicoOperacao = {
   salvarRota: api.salvarRota,
 };
 
-// Um estado só, sem combinações impossíveis como "carregando e com erro".
 export type EstadoOperacao =
   | {tipo: 'carregando'}
   | {tipo: 'erro'; mensagem: string}
   | {tipo: 'semRota'}
   | {tipo: 'pronto'; rota: Rota; motoristas: Motorista[]};
 
-// Sem mensagem quando a sessão expirou: o SessaoViewModel já leva o usuário ao login.
 export type ResultadoSalvar = {ok: true} | {ok: false; mensagem?: string};
 
 export type OperacaoViewModel = {
@@ -44,9 +41,7 @@ export function useOperacaoViewModel(
   servico: ServicoOperacao = servicoOperacaoApi,
 ): OperacaoViewModel {
   const [estado, setEstado] = useState<EstadoOperacao>({tipo: 'carregando'});
-  // Respostas de uma carga mais antiga são descartadas (outra carga começou depois).
   const cargaAtual = useRef(0);
-  // Respostas de um usuário anterior são descartadas (logout ou troca de conta no meio da requisição).
   const usuarioAtual = useRef(0);
 
   const recarregar = useCallback(async () => {
@@ -57,7 +52,6 @@ export function useOperacaoViewModel(
     }
 
     try {
-      // O backend decide qual rota cada papel vê; só o gestor precisa da lista de motoristas.
       const [rota, motoristas] = await Promise.all([
         servico.buscarRotaAtual(),
         usuario.papel === 'gestor' ? servico.buscarMotoristas() : Promise.resolve([]),

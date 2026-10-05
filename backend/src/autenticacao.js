@@ -9,8 +9,6 @@ function validarSegredoJwt(segredo) {
   }
 }
 
-// Assina um token de teste: pega formatos que o jsonwebtoken não entende ("12 horas") e
-// validades zero ou negativas, que ele aceita mas gerariam tokens já vencidos.
 function validarValidadeToken(validade) {
   let dados;
   try {
@@ -27,11 +25,8 @@ function criarServicoAutenticacao({repositorio, segredo, validade = '12h'}) {
   validarSegredoJwt(segredo);
   validarValidadeToken(validade);
 
-  // Comparado quando o e-mail não existe, para a resposta levar o mesmo tempo nos dois casos
-  // e não revelar quais e-mails estão cadastrados.
   const hashSemUsuario = bcrypt.hashSync('usuario-inexistente', 10);
 
-  // Devolve {token, usuario} ou null para credenciais inválidas (sem dizer qual campo errou).
   async function entrar(email, senha) {
     const credenciais = repositorio.buscarCredenciais(email.trim().toLowerCase());
     const confere = await bcrypt.compare(senha, credenciais?.senha || hashSemUsuario);
@@ -49,7 +44,6 @@ function criarServicoAutenticacao({repositorio, segredo, validade = '12h'}) {
     return {token, usuario};
   }
 
-  // Devolve {usuario} ou {erro}. O papel vem do banco, não do token, para refletir mudanças.
   function verificar(cabecalhoAuthorization) {
     const [tipo, token] = (cabecalhoAuthorization ?? '').split(' ');
     if (tipo !== 'Bearer' || !token) {
@@ -68,7 +62,6 @@ function criarServicoAutenticacao({repositorio, segredo, validade = '12h'}) {
       };
     }
 
-    // Só este servidor assina tokens e sempre inclui o sub; sem ele o token não identifica ninguém.
     if (typeof dados.sub !== 'string' || !dados.sub) {
       return {erro: 'Autenticação inválida.'};
     }

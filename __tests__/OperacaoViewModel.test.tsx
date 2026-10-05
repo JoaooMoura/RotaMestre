@@ -20,7 +20,6 @@ const EQUIPE: Motorista[] = [
   {id: '1', nome: 'Carlos', email: 'motorista@rotamestre.com', veiculo: 'Van', disponivel: true},
 ];
 
-// Serviço falso injetado: nenhuma chamada de rede nos testes.
 function criarServicoFalso() {
   return {
     buscarRotaAtual: jest.fn<Promise<Rota | null>, []>().mockResolvedValue(ROTA),
@@ -29,7 +28,6 @@ function criarServicoFalso() {
   } satisfies ServicoOperacao;
 }
 
-// Promessa controlada pelo teste, para simular uma resposta que chega depois.
 function adiada<T>() {
   let resolver: (valor: T) => void = () => {};
   const promessa = new Promise<T>(resolve => (resolver = resolve));

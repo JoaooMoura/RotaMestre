@@ -5,13 +5,17 @@ import {
   ScrollView,
   StatusBar,
   Text,
-  TextInput,
-  TextInputProps,
   View,
 } from 'react-native';
 import {MaterialDesignIcons} from '@react-native-vector-icons/material-design-icons';
-import MaskInput, {Mask, Masks} from 'react-native-mask-input';
-import {BotaoContornado, BotaoPrincipal, BotaoTexto, NomeIcone} from '../componentes';
+import {Masks} from 'react-native-mask-input';
+import {
+  BotaoContornado,
+  BotaoPrincipal,
+  BotaoTexto,
+  Campo,
+  ProgressoEtapas,
+} from '../componentes';
 import {cores, estilos} from '../estilos';
 import {cadastrarMotorista} from '../servicos/api';
 import {useSessao} from '../viewmodels/SessaoViewModel';
@@ -381,8 +385,6 @@ export function TelaAutenticacao() {
   );
 }
 
-// Componentes visuais do fluxo de autenticação: só aparência, sem regra de negócio.
-
 function FaixaMarca() {
   return (
     <View style={estilos.loginFaixa}>
@@ -398,7 +400,6 @@ function FaixaMarca() {
 }
 
 type LayoutAutenticacaoProps = {
-  // Sem título, a faixa mostra a marca (login, splash e sucesso).
   titulo?: string;
   apoio?: string;
   onVoltar?: () => void;
@@ -437,81 +438,12 @@ function LayoutAutenticacao({
             {titulo}
           </Text>
           {apoio ? <Text style={estilos.loginSlogan}>{apoio}</Text> : null}
-          {etapaCadastro ? <ProgressoCadastro etapa={etapaCadastro} /> : null}
+          {etapaCadastro ? <ProgressoEtapas etapa={etapaCadastro} total={TOTAL_ETAPAS_CADASTRO} /> : null}
         </View>
       ) : (
         <FaixaMarca />
       )}
       <View style={estilos.loginFolha}>{children}</View>
     </ScrollView>
-  );
-}
-
-function ProgressoCadastro({etapa}: {etapa: number}) {
-  const etapas = Array.from({length: TOTAL_ETAPAS_CADASTRO}, (_, indice) => indice + 1);
-  return (
-    <View
-      accessibilityRole="progressbar"
-      accessibilityLabel={`Etapa ${etapa} de ${TOTAL_ETAPAS_CADASTRO}`}
-      accessibilityValue={{min: 1, max: TOTAL_ETAPAS_CADASTRO, now: etapa}}>
-      <View style={estilos.loginProgresso}>
-        {etapas.map(numero => (
-          <View
-            key={numero}
-            style={[
-              estilos.loginProgressoSegmento,
-              numero <= etapa && estilos.loginProgressoSegmentoAtivo,
-            ]}
-          />
-        ))}
-      </View>
-      <Text style={estilos.loginProgressoTexto}>
-        Etapa {etapa} de {TOTAL_ETAPAS_CADASTRO}
-      </Text>
-    </View>
-  );
-}
-
-type CampoProps = TextInputProps & {
-  rotulo: string;
-  icone: NomeIcone;
-  mascara?: Mask;
-  acao?: React.ReactNode;
-  estiloTexto?: TextInputProps['style'];
-};
-
-function Campo({rotulo, icone, mascara, acao, estiloTexto, onFocus, onBlur, ...props}: CampoProps) {
-  const [focado, setFocado] = useState(false);
-  const propsEntrada: TextInputProps = {
-    ...props,
-    style: [estilos.loginCampoTexto, !acao && estilos.loginCampoTextoSemAcao, estiloTexto],
-    placeholderTextColor: cores.contorno,
-    accessibilityLabel: rotulo,
-    onFocus: evento => {
-      setFocado(true);
-      onFocus?.(evento);
-    },
-    onBlur: evento => {
-      setFocado(false);
-      onBlur?.(evento);
-    },
-  };
-  return (
-    <>
-      <Text style={estilos.loginRotulo}>{rotulo}</Text>
-      <View style={[estilos.loginCampo, focado && estilos.loginCampoFocado]}>
-        <MaterialDesignIcons
-          name={icone}
-          size={24}
-          color={focado ? cores.primaria : cores.textoApoio}
-        />
-        {mascara ? (
-          <MaskInput {...propsEntrada} mask={mascara} />
-        ) : (
-          <TextInput {...propsEntrada} />
-        )}
-        {acao}
-      </View>
-    </>
   );
 }

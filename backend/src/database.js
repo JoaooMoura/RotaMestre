@@ -2,8 +2,6 @@ const fs = require('node:fs');
 const path = require('node:path');
 const {DatabaseSync} = require('node:sqlite');
 
-
-
 const ROTA_INICIAL = {
   id: 'RT-001',
   nome: 'Entregas Vale do Paraíba',
@@ -42,7 +40,6 @@ const ROTA_INICIAL = {
   ],
 };
 
-// Contas criadas apenas com a opção seedDemo (ROTAMESTRE_SEED_DEMO=1).
 const SENHA_DEMO = '123';
 const GESTOR_DEMO = {
   id: 'G-1',
@@ -58,7 +55,6 @@ const MOTORISTA_DEMO = {
   disponivel: true,
 };
 
-// Código do SQLite para violação de UNIQUE (SQLITE_CONSTRAINT_UNIQUE).
 const SQLITE_CONSTRAINT_UNIQUE = 2067;
 
 function ddlMotoristas(nomeTabela) {
@@ -87,7 +83,6 @@ function criarRepositorio(caminhoBanco, {seedDemo = false} = {}) {
       .some(item => item.name === coluna);
   }
 
-  // Antes de usuarios, e-mail e senha ficavam em motoristas.
   const bancoLegado = tabelaTemColuna('motoristas', 'email');
   if (bancoLegado) {
     const backup = `${caminhoBanco}.antes-usuarios.bak`;
@@ -145,20 +140,17 @@ function criarRepositorio(caminhoBanco, {seedDemo = false} = {}) {
     );
   `);
 
-  // Bancos criados antes de cada mudança de schema já têm as tabelas, mas sem as colunas novas.
   function adicionarColunaSeFaltar(tabela, coluna) {
     if (!tabelaTemColuna(tabela, coluna)) {
       banco.exec(`ALTER TABLE ${tabela} ADD COLUMN ${coluna} TEXT`);
     }
   }
 
-  adicionarColunaSeFaltar('comprovantes', 'foto'); // US07.04
+  adicionarColunaSeFaltar('comprovantes', 'foto');
   ['telefone', 'cnh_numero', 'cnh_categoria', 'cnh_validade'].forEach(coluna =>
-    adicionarColunaSeFaltar('motoristas', coluna), // US02.01
+    adicionarColunaSeFaltar('motoristas', coluna),
   );
 
-  // Move e-mail e senha de motoristas para usuarios (papel 'motorista') e reconstrói motoristas
-  // sem essas colunas. O SQLite não remove coluna UNIQUE com DROP COLUMN, por isso a reconstrução.
   function migrarParaUsuarios() {
     banco.exec('PRAGMA foreign_keys = OFF');
     banco.exec('BEGIN IMMEDIATE');
@@ -232,7 +224,6 @@ function criarRepositorio(caminhoBanco, {seedDemo = false} = {}) {
     }
   }
 
-  // Cria o usuário (papel sempre 'motorista') e o perfil de motorista na mesma transação.
   function salvarMotorista(motorista) {
     banco.exec('BEGIN IMMEDIATE');
     try {
@@ -258,7 +249,6 @@ function criarRepositorio(caminhoBanco, {seedDemo = false} = {}) {
       throw erro;
     }
 
-    // Campos explícitos: a senha (mesmo com hash) nunca sai do repositório.
     return {
       id: motorista.id,
       nome: motorista.nome,
@@ -287,7 +277,6 @@ function criarRepositorio(caminhoBanco, {seedDemo = false} = {}) {
       }));
   }
 
-  // Uso exclusivo da autenticação: é a única consulta que devolve o hash da senha.
   function buscarCredenciais(email) {
     const usuario = banco
       .prepare('SELECT id, nome, email, senha, papel FROM usuarios WHERE email = ?')
@@ -302,7 +291,6 @@ function criarRepositorio(caminhoBanco, {seedDemo = false} = {}) {
     return usuario ? {...usuario} : null;
   }
 
-  // Rota em execução tem prioridade sobre uma programada mais nova; concluídas ficam por último.
   const ORDEM_ROTA_ATUAL = `
     ORDER BY CASE status
       WHEN 'Em andamento' THEN 0
@@ -448,7 +436,6 @@ function criarRepositorio(caminhoBanco, {seedDemo = false} = {}) {
     };
   }
 
-  // Cada conta e a rota de exemplo são criadas só se ainda não existirem, inclusive em bancos migrados.
   function garantirDadosDemo() {
     const bcrypt = require('bcryptjs');
     let hashDemo;

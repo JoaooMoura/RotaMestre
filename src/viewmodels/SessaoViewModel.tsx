@@ -2,7 +2,6 @@ import React, {createContext, useCallback, useContext, useEffect, useMemo, useSt
 import * as api from '../servicos/api';
 import {Sessao, Usuario} from '../tipos';
 
-// Dependência injetada: em produção é a API real; nos testes, um serviço falso.
 export type ServicoAutenticacao = {
   entrar: (email: string, senha: string) => Promise<Sessao>;
   definirToken: (token: string | null) => void;
@@ -19,9 +18,7 @@ export type SessaoViewModel = {
   usuario: Usuario | null;
   verificando: boolean;
   erro: string;
-  // 1ª etapa: confere e-mail e senha no backend. A sessão só começa após o código.
   verificarCredenciais: (email: string, senha: string) => Promise<boolean>;
-  // 2ª etapa (US02.04, simulada): aceita qualquer código de 6 dígitos.
   confirmarCodigo: (codigo: string) => boolean;
   sair: () => void;
   limparErro: () => void;

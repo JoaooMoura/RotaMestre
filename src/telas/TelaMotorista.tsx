@@ -18,13 +18,15 @@ import {
   BotaoPrincipal,
   Cabecalho,
   CardParada,
+  CartaoRota,
   ItemNavegacao,
   LayoutFaixa,
   NavegacaoInferior,
+  PerfilUsuario,
 } from '../componentes';
 import {notificacoesIniciais} from '../dados';
 import {cores, estilos} from '../estilos';
-import {iniciais, primeiroNome} from '../nomes';
+import {primeiroNome} from '../nomes';
 import {Comprovante, Parada, Rota, StatusParada, TipoParada, Usuario} from '../tipos';
 import SignatureScreen, {SignatureViewRef} from 'react-native-signature-canvas';
 import {
@@ -36,7 +38,6 @@ import {
 } from 'react-native-image-picker';
 
 const FOTO_MAX_BYTES = 512 * 1024;
-// Mesmos formatos aceitos pelo backend (fotoValida em server.js).
 const TIPOS_FOTO_ACEITOS = ['image/jpeg', 'image/png'];
 const OPCOES_FOTO: CameraOptions = {
   mediaType: 'photo',
@@ -59,10 +60,6 @@ const ITENS_NAVEGACAO: ItemNavegacao[] = [
   {nome: 'Perfil', icone: 'account-circle-outline', iconeAtivo: 'account-circle'},
 ];
 
-const NOME_PAPEL: Record<Usuario['papel'], string> = {
-  motorista: 'Motorista',
-  gestor: 'Gestor',
-};
 type Fluxo =
   | 'base'
   | 'rota'
@@ -76,7 +73,6 @@ type Fluxo =
   | 'foto'
   | 'concluida';
 
-// Etapas de tarefa em tela cheia: a navbar some para o motorista não sair no meio da entrega.
 const FLUXOS_TELA_CHEIA: Fluxo[] = ['adicionar', 'verificar', 'status', 'assinatura', 'foto', 'concluida'];
 
 type Props = {
@@ -150,7 +146,6 @@ export function TelaMotorista({usuario, rota, onAtualizarRota, onSair}: Props) {
       return;
     }
 
-    // restrictMimeTypes é só uma sugestão ao seletor do Android; a conferência garante a regra do backend.
     const tipo = imagem.type ?? 'image/jpeg';
     if (!TIPOS_FOTO_ACEITOS.includes(tipo)) {
       Alert.alert('Formato não suportado', 'Escolha uma foto em JPEG ou PNG, ou use a câmera.');
@@ -199,7 +194,6 @@ export function TelaMotorista({usuario, rota, onAtualizarRota, onSair}: Props) {
     setFluxo('detalhe');
   }
 
-  // Telas cheias do fluxo da rota (sem barra de navegação); null na área com abas.
   function telaDoFluxo() {
     if (fluxo === 'adicionar') {
       return (
@@ -574,55 +568,10 @@ export function TelaMotorista({usuario, rota, onAtualizarRota, onSair}: Props) {
     return null;
   }
 
-  function conteudoPerfil() {
-    return (
-      <LayoutFaixa
-        faixa={
-          <View style={estilos.perfilCabecalho}>
-            <View style={estilos.perfilAvatar} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-              <Text style={estilos.perfilIniciais}>{iniciais(usuario.nome)}</Text>
-            </View>
-            <View style={estilos.flex}>
-              <Text style={estilos.perfilNome} accessibilityRole="header">
-                {usuario.nome}
-              </Text>
-              <Text style={estilos.loginSlogan}>{NOME_PAPEL[usuario.papel]}</Text>
-            </View>
-          </View>
-        }>
-        <Text style={estilos.secaoRotulo}>Conta</Text>
-        <View style={estilos.perfilLinha}>
-          <MaterialDesignIcons name="email-outline" size={24} color={cores.textoApoio} />
-          <View style={estilos.flex}>
-            <Text style={estilos.metricaRotulo}>E-mail</Text>
-            <Text style={estilos.perfilValor}>{usuario.email}</Text>
-          </View>
-        </View>
-        <View style={estilos.perfilSeparador} />
-        <View style={estilos.perfilLinha}>
-          <MaterialDesignIcons name="badge-account-outline" size={24} color={cores.textoApoio} />
-          <View style={estilos.flex}>
-            <Text style={estilos.metricaRotulo}>Papel</Text>
-            <Text style={estilos.perfilValor}>{NOME_PAPEL[usuario.papel]}</Text>
-          </View>
-        </View>
-
-        <BotaoContornado titulo="Sair da conta" icone="logout" perigo onPress={onSair} />
-        <View style={estilos.perfilRodape}>
-          <MaterialDesignIcons name="information-outline" size={16} color={cores.textoApoio} />
-          <Text style={estilos.perfilRodapeTexto}>Versão de demonstração · Sprint 1</Text>
-        </View>
-      </LayoutFaixa>
-    );
-  }
-
   function conteudoHoje() {
-    // Só para exibição: a primeira parada que ainda não foi finalizada.
     const proximaParada = rota.paradas.find(
       item => item.status !== 'Concluída' && item.status !== 'Não realizada',
     );
-    const percentual = rota.status === 'Concluída' ? 100 : Math.round(progresso);
-    const restantes = rota.paradas.length - concluidas;
 
     return (
       <LayoutFaixa
@@ -635,47 +584,7 @@ export function TelaMotorista({usuario, rota, onAtualizarRota, onSair}: Props) {
           </>
         }>
         <Text style={estilos.secaoRotulo}>Rota do dia</Text>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={`Rota do dia: ${rota.nome}`}
-          onPress={() => setFluxo('rota')}
-          style={({pressed}) => [estilos.cartao, pressed && estilos.cartaoPressionado]}>
-          <View style={estilos.linhaEntre}>
-            <Text style={estilos.cartaoTitulo}>{rota.nome}</Text>
-            <Badge status={rota.status} />
-          </View>
-          <View style={estilos.linhaIcone}>
-            <MaterialDesignIcons name="clock-outline" size={16} color={cores.textoApoio} />
-            <Text style={estilos.textoApoio}>
-              {rota.id} · início às {rota.horario}
-            </Text>
-          </View>
-          <View style={estilos.progressoLinha}>
-            <Text style={estilos.progressoPercentual}>{percentual}%</Text>
-            <Text style={estilos.textoApoio}>
-              {concluidas} de {rota.paradas.length} paradas concluídas
-            </Text>
-          </View>
-          <View style={estilos.progressoFundo}>
-            <View style={[estilos.progresso, {width: `${percentual}%`}]} />
-          </View>
-          <View style={estilos.metricasLinha}>
-            <View style={estilos.metricaItem}>
-              <Text style={estilos.metricaValor}>{rota.paradas.length}</Text>
-              <Text style={estilos.metricaRotulo}>Paradas</Text>
-            </View>
-            <View style={estilos.metricaDivisor} />
-            <View style={estilos.metricaItem}>
-              <Text style={estilos.metricaValor}>{concluidas}</Text>
-              <Text style={estilos.metricaRotulo}>Concluídas</Text>
-            </View>
-            <View style={estilos.metricaDivisor} />
-            <View style={estilos.metricaItem}>
-              <Text style={estilos.metricaValor}>{restantes}</Text>
-              <Text style={estilos.metricaRotulo}>Restantes</Text>
-            </View>
-          </View>
-        </Pressable>
+        <CartaoRota rota={rota} onPress={() => setFluxo('rota')} />
 
         <Text style={[estilos.secaoRotulo, estilos.secaoRotuloAfastado]}>Próxima parada</Text>
         {proximaParada ? (
@@ -711,7 +620,7 @@ export function TelaMotorista({usuario, rota, onAtualizarRota, onSair}: Props) {
 
   function conteudoAba() {
     if (aba === 'Perfil') {
-      return conteudoPerfil();
+      return <PerfilUsuario usuario={usuario} onSair={onSair} />;
     }
     if (aba === 'Notificações') {
       return (
@@ -729,9 +638,7 @@ export function TelaMotorista({usuario, rota, onAtualizarRota, onSair}: Props) {
     return <TransicaoEntrada key={fluxo}>{tela}</TransicaoEntrada>;
   }
 
-  // Lista, detalhe e pausa da rota ficam sob a aba "Minha rota", mesmo quando abertos pela Hoje.
   const abaDestacada: Aba = tela ? 'Minha rota' : aba;
-  // A `key` recria a transição a cada troca de tela. "rota" e "ativa" são a mesma tela: não repete o fade.
   const chaveTela = tela ? (fluxo === 'ativa' ? 'rota' : fluxo) : aba;
 
   return (

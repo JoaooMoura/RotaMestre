@@ -16,7 +16,6 @@ function ConteudoApp() {
   const {usuario, sair} = useSessao();
   const {estado, recarregar, atualizarRota} = useOperacaoViewModel(usuario);
 
-  // O ViewModel decide o resultado; a View só decide como mostrar a falha.
   async function salvar(rota: Rota) {
     const resultado = await atualizarRota(rota);
     if (!resultado.ok && resultado.mensagem) {
@@ -88,6 +87,7 @@ function ConteudoApp() {
     case 'pronto':
       return usuario.papel === 'gestor' ? (
         <TelaGestorSprint
+          usuario={usuario}
           rota={estado.rota}
           motoristas={estado.motoristas}
           onAtualizarRota={salvar}

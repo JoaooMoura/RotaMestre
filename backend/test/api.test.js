@@ -26,12 +26,10 @@ async function entrar(email, senha = '123') {
   });
 }
 
-// Por padrão os testes agem como o gestor de demonstração.
 function cabecalhos(token = tokenGestor) {
   return {'Content-Type': 'application/json', Authorization: `Bearer ${token}`};
 }
 
-// Campos de CNH e telefone exigidos pelo cadastro (US02.01).
 const DADOS_CNH = {
   telefone: '(12) 99876-5432',
   cnhNumero: '12345678901',
@@ -554,8 +552,6 @@ test('JSON válido que não é objeto responde 400', async () => {
     });
   }
 });
-
-// ---------- Autenticação e papéis (B2) ----------
 
 const jwt = require('jsonwebtoken');
 

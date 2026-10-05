@@ -34,7 +34,6 @@ function somenteDigitos(valor) {
   return typeof valor === 'string' ? valor.replace(/\D/g, '') : '';
 }
 
-// Converte DD/MM/AAAA para AAAA-MM-DD; devolve null se a data não existir (ex.: 31/02/2030).
 function dataIsoValida(valor) {
   const partes = typeof valor === 'string' && valor.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
   if (!partes) {
@@ -49,7 +48,6 @@ function dataIsoValida(valor) {
   return existe ? `${ano}-${mes}-${dia}` : null;
 }
 
-// Valida e normaliza o cadastro; devolve {erro} ou {motorista} pronto para gravar.
 function validarCadastroMotorista(dados) {
   if (!dados || ![dados.id, dados.nome, dados.email, dados.senha, dados.veiculo].every(textoValido)) {
     return {erro: 'Dados obrigatórios faltando.'};
@@ -70,7 +68,6 @@ function validarCadastroMotorista(dados) {
   if (!cnhValidade) {
     return {erro: 'Data de validade da CNH inválida.'};
   }
-  // E-mail normalizado: a restrição UNIQUE do SQLite diferencia maiúsculas, o login não.
   const email = dados.email.trim().toLowerCase();
   return {motorista: {...dados, email, telefone, cnhNumero, cnhCategoria, cnhValidade}};
 }
@@ -172,7 +169,6 @@ function lerJson(requisicao) {
     requisicao.on('data', parte => {
       tamanho += parte.length;
       if (tamanho > CORPO_MAX_BYTES) {
-        // Continua lendo sem guardar: destruir a conexão impede o cliente de receber o 413.
         excedeu = true;
         partes.length = 0;
         return;
@@ -192,7 +188,6 @@ function lerJson(requisicao) {
         reject(erroHttp(400, 'JSON inválido.'));
         return;
       }
-      // null, números e textos são JSON válido, mas todos os endpoints esperam um objeto.
       if (corpo === null || typeof corpo !== 'object' || Array.isArray(corpo)) {
         reject(erroHttp(400, 'O corpo da requisição deve ser um objeto JSON.'));
         return;
@@ -205,7 +200,6 @@ function lerJson(requisicao) {
 }
 
 function criarServidor({caminhoBanco, segredoJwt, validadeToken = '12h', seedDemo = false}) {
-  // Antes de abrir o banco: uma configuração inválida não pode deixar o arquivo aberto.
   validarSegredoJwt(segredoJwt);
   validarValidadeToken(validadeToken);
   const repositorio = criarRepositorio(caminhoBanco, {seedDemo});
@@ -215,7 +209,6 @@ function criarServidor({caminhoBanco, segredoJwt, validadeToken = '12h', seedDem
     validade: validadeToken,
   });
 
-  // Devolve o usuário do token ou lança 401 (sem token/inválido) ou 403 (papel não autorizado).
   function exigirUsuario(requisicao, papeisPermitidos) {
     const {usuario, erro} = autenticacao.verificar(requisicao.headers.authorization);
     if (erro) {
@@ -256,7 +249,6 @@ function criarServidor({caminhoBanco, segredoJwt, validadeToken = '12h', seedDem
         return;
       }
 
-      // Cadastro público: sempre cria papel 'motorista', qualquer papel enviado é ignorado.
       if (requisicao.method === 'POST' && url.pathname === '/api/motoristas') {
         const {erro: erroCadastro, motorista} = validarCadastroMotorista(await lerJson(requisicao));
         if (erroCadastro) {
@@ -284,7 +276,6 @@ function criarServidor({caminhoBanco, segredoJwt, validadeToken = '12h', seedDem
 
       if (requisicao.method === 'GET' && url.pathname === '/api/rotas/atual') {
         const usuario = exigirUsuario(requisicao);
-        // O motorista só vê a própria rota; o filtro por parâmetro vale apenas para o gestor.
         const motoristaId =
           usuario.papel === 'motorista'
             ? usuario.id
@@ -313,7 +304,6 @@ function criarServidor({caminhoBanco, segredoJwt, validadeToken = '12h', seedDem
           return;
         }
 
-        // O motorista só altera a rota já atribuída a ele e não pode criar nem reatribuir rotas.
         if (usuario.papel === 'motorista') {
           const existente = repositorio.buscarRota(rota.id);
           if (
@@ -350,7 +340,6 @@ if (require.main === module) {
     process.env.ROTAMESTRE_DB_PATH ||
     path.join(__dirname, '..', 'data', 'rotamestre.sqlite');
 
-  // Sem segredo não há como assinar tokens com segurança: o servidor não sobe com um padrão.
   if (!process.env.JWT_SECRET) {
     process.stderr.write(
       'JWT_SECRET não definido. Copie backend/.env.example para backend/.env e preencha.\n',
@@ -367,7 +356,6 @@ if (require.main === module) {
       seedDemo: process.env.ROTAMESTRE_SEED_DEMO === '1',
     });
   } catch (falha) {
-    // Configuração inválida: mensagem direta em vez do stack trace.
     process.stderr.write(`Não foi possível iniciar a API: ${falha.message}\n`);
     process.exit(1);
   }

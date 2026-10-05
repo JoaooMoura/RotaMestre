@@ -1,4 +1,3 @@
-// Papel definido pelo backend (tabela usuarios); o app nunca escolhe o papel.
 export type Papel = 'gestor' | 'motorista';
 
 export type Usuario = {
@@ -35,7 +34,6 @@ export type Motorista = {
   disponivel: boolean;
 };
 
-// Dados enviados no cadastro; a senha nunca volta da API e CNH/telefone não aparecem na listagem.
 export type NovoMotorista = Motorista & {
   senha: string;
   telefone: string;
@@ -46,9 +44,7 @@ export type NovoMotorista = Motorista & {
 
 export type Comprovante = {
   recebedor: string;
-  // Data URI PNG, enviado apenas no salvamento que conclui a entrega.
   assinatura?: string;
-  // Data URI JPEG/PNG comprimido; enviado junto com a assinatura.
   foto?: string;
   registradoEm?: number;
 };

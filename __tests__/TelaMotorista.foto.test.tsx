@@ -27,7 +27,6 @@ jest.mock('react-native-image-picker', () => ({
   launchImageLibrary: jest.fn(),
 }));
 
-// A primeira renderização compila todos os módulos da tela e passa de 5 s.
 jest.setTimeout(20000);
 
 const camera = launchCamera as jest.Mock;
@@ -361,14 +360,12 @@ describe('TelaMotorista - foto do comprovante (US07.04)', () => {
 
     test('toque duplo em "Confirmar entrega" envia a conclusão uma única vez', async () => {
       camera.mockResolvedValue(fotoTirada('FOTO'));
-      // Simula uma rede lenta: o envio só termina 100 ms depois do primeiro toque.
       const envioPendente = jest.fn(
         () => new Promise<boolean>(resolve => setTimeout(() => resolve(true), 100)),
       );
       await abrirTelaDaFoto(envioPendente);
       await tocarNaCamera();
 
-      // O segundo toque usa o mesmo elemento: com o envio pendente, o título muda para "Enviando...".
       const confirmar = botao('Confirmar entrega');
       const primeiroToque = fireEvent.press(confirmar);
       await new Promise<void>(resolve => setTimeout(() => resolve(), 20));

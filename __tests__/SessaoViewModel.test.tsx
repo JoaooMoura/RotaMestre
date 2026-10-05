@@ -13,7 +13,6 @@ const SESSAO_GESTOR: Sessao = {
   usuario: {id: 'G-1', nome: 'Rodrigo', email: 'gestor@rotamestre.com', papel: 'gestor'},
 };
 
-// Serviço falso injetado no ViewModel: nenhuma chamada de rede nos testes.
 function criarServicoFalso() {
   let avisarExpiracao: () => void = () => {};
   const servico = {

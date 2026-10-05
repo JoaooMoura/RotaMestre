@@ -2,7 +2,6 @@ import {Motorista, NovoMotorista, Rota, Sessao} from '../tipos';
 
 const API_URL = 'http://127.0.0.1:3000/api';
 
-// Status usado quando a requisição nem chegou ao servidor (sem rede, servidor fora do ar).
 export const SEM_CONEXAO = 0;
 
 export class ErroApi extends Error {
@@ -11,7 +10,6 @@ export class ErroApi extends Error {
   }
 }
 
-// O token fica só em memória: fechar o app encerra a sessão (persistência fica para a Sprint 2).
 let tokenAtual: string | null = null;
 let aoExpirar: (() => void) | null = null;
 
@@ -19,7 +17,6 @@ export function definirToken(token: string | null) {
   tokenAtual = token;
 }
 
-// Registra quem deve ser avisado quando uma requisição autenticada receber 401.
 export function aoExpirarSessao(callback: () => void) {
   aoExpirar = callback;
   return () => {
@@ -46,11 +43,9 @@ async function requisicao<T>(caminho: string, opcoes?: RequestInit): Promise<T> 
     throw new ErroApi('Sem conexão com o servidor. Verifique a internet e tente novamente.', SEM_CONEXAO);
   }
 
-  // Respostas de erro fora do padrão (ex.: HTML de um proxy) não podem virar "JSON Parse error".
   const corpo = await resposta.json().catch(() => ({}));
 
   if (!resposta.ok) {
-    // Só uma requisição que levou token pode significar sessão expirada; o 401 do login é senha errada.
     if (resposta.status === 401 && tokenEnviado) {
       aoExpirar?.();
     }
@@ -78,7 +73,6 @@ export function cadastrarMotorista(motorista: NovoMotorista) {
   });
 }
 
-// Para o motorista, o backend usa o id do token e ignora o filtro; o gestor pode filtrar.
 export async function buscarRotaAtual(motoristaId?: string): Promise<Rota | null> {
   const filtro = motoristaId ? `?motoristaId=${encodeURIComponent(motoristaId)}` : '';
   try {
