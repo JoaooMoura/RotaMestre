@@ -1,6 +1,5 @@
+import {API_URL} from '../configuracao';
 import {Motorista, NovoMotorista, Rota, Sessao} from '../tipos';
-
-const API_URL = 'http://127.0.0.1:3000/api';
 
 export const SEM_CONEXAO = 0;
 
