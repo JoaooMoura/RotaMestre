@@ -47,6 +47,7 @@ export function TelaAutenticacao() {
   const [modelo, setModelo] = useState('');
   const [ano, setAno] = useState('');
   const [senhaVisivel, setSenhaVisivel] = useState(false);
+  const [manterConectado, setManterConectado] = useState(false);
 
   useEffect(() => {
     const temporizador = setTimeout(() => setEtapa('login'), 900);
@@ -61,7 +62,7 @@ export function TelaAutenticacao() {
   }
 
   function confirmarCodigo() {
-    if (!sessao.confirmarCodigo(codigo)) {
+    if (!sessao.confirmarCodigo(codigo, manterConectado)) {
       Alert.alert('Código inválido', 'Digite um código com seis números.');
     }
   }
@@ -358,6 +359,19 @@ export function TelaAutenticacao() {
         autoComplete="password"
         acao={botaoVerSenha}
       />
+
+      <Pressable
+        style={estilos.loginOpcao}
+        onPress={() => setManterConectado(valor => !valor)}
+        accessibilityRole="checkbox"
+        accessibilityState={{checked: manterConectado}}>
+        <MaterialDesignIcons
+          name={manterConectado ? 'checkbox-marked' : 'checkbox-blank-outline'}
+          size={24}
+          color={manterConectado ? cores.primaria : cores.textoApoio}
+        />
+        <Text style={estilos.loginOpcaoTexto}>Manter conectado neste aparelho</Text>
+      </Pressable>
 
       {sessao.erro ? (
         <View style={estilos.loginErro} accessibilityLiveRegion="polite">

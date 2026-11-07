@@ -10,6 +10,7 @@ export type Usuario = {
 export type Sessao = {
   token: string;
   usuario: Usuario;
+  expiraEm: number;
 };
 
 export type TipoParada = 'Coleta' | 'Entrega';

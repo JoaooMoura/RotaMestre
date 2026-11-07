@@ -12,8 +12,17 @@ import {Rota} from './src/tipos';
 import {useOperacaoViewModel} from './src/viewmodels/OperacaoViewModel';
 import {SessaoProvider, useSessao} from './src/viewmodels/SessaoViewModel';
 
+function Carregando({mensagem}: {mensagem: string}) {
+  return (
+    <View style={estilos.centro}>
+      <ActivityIndicator size="large" />
+      <Text style={estilos.subtitulo}>{mensagem}</Text>
+    </View>
+  );
+}
+
 function ConteudoApp() {
-  const {usuario, sair} = useSessao();
+  const {usuario, restaurando, sair} = useSessao();
   const {estado, recarregar, atualizarRota} = useOperacaoViewModel(usuario);
 
   async function salvar(rota: Rota) {
@@ -24,18 +33,17 @@ function ConteudoApp() {
     return resultado.ok;
   }
 
+  if (restaurando) {
+    return <Carregando mensagem="Abrindo sua sessão..." />;
+  }
+
   if (!usuario) {
     return <TelaAutenticacao />;
   }
 
   switch (estado.tipo) {
     case 'carregando':
-      return (
-        <View style={estilos.centro}>
-          <ActivityIndicator size="large" />
-          <Text style={estilos.subtitulo}>Carregando dados da operação...</Text>
-        </View>
-      );
+      return <Carregando mensagem="Carregando dados da operação..." />;
 
     case 'erro':
       return (

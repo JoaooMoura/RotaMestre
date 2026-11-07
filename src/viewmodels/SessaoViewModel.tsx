@@ -1,5 +1,14 @@
-import React, {createContext, useCallback, useContext, useEffect, useMemo, useState} from 'react';
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import * as api from '../servicos/api';
+import {ArmazenamentoSessao, armazenamentoSessaoSeguro} from '../servicos/armazenamentoSessao';
 import {Sessao, Usuario} from '../tipos';
 
 export type ServicoAutenticacao = {
@@ -16,10 +25,11 @@ export const servicoAutenticacaoApi: ServicoAutenticacao = {
 
 export type SessaoViewModel = {
   usuario: Usuario | null;
+  restaurando: boolean;
   verificando: boolean;
   erro: string;
   verificarCredenciais: (email: string, senha: string) => Promise<boolean>;
-  confirmarCodigo: (codigo: string) => boolean;
+  confirmarCodigo: (codigo: string, manterConectado?: boolean) => boolean;
   sair: () => void;
   limparErro: () => void;
 };
@@ -33,17 +43,49 @@ function mensagemDeFalha(falha: unknown) {
   return 'Não foi possível entrar. Tente novamente.';
 }
 
-export function useSessaoViewModel(servico: ServicoAutenticacao): SessaoViewModel {
+export function useSessaoViewModel(
+  servico: ServicoAutenticacao,
+  armazenamento: ArmazenamentoSessao,
+): SessaoViewModel {
   const [usuario, setUsuario] = useState<Usuario | null>(null);
   const [pendente, setPendente] = useState<Sessao | null>(null);
+  const [restaurando, setRestaurando] = useState(true);
   const [verificando, setVerificando] = useState(false);
   const [erro, setErro] = useState('');
+  const geracao = useRef(0);
 
   const sair = useCallback(() => {
+    geracao.current++;
     servico.definirToken(null);
     setPendente(null);
     setUsuario(null);
-  }, [servico]);
+    armazenamento.limpar().catch(() => {});
+  }, [servico, armazenamento]);
+
+  useEffect(() => {
+    const geracaoInicial = geracao.current;
+
+    async function restaurar() {
+      try {
+        const salva = await armazenamento.ler();
+        if (geracao.current !== geracaoInicial) {
+          return;
+        }
+        if (salva && salva.expiraEm > Date.now()) {
+          servico.definirToken(salva.token);
+          setUsuario(salva.usuario);
+        } else if (salva) {
+          await armazenamento.limpar();
+        }
+      } catch {
+        await armazenamento.limpar().catch(() => {});
+      } finally {
+        setRestaurando(false);
+      }
+    }
+
+    restaurar();
+  }, [servico, armazenamento]);
 
   useEffect(
     () =>
@@ -77,23 +119,43 @@ export function useSessaoViewModel(servico: ServicoAutenticacao): SessaoViewMode
   );
 
   const confirmarCodigo = useCallback(
-    (codigo: string) => {
+    (codigo: string, manterConectado = false) => {
       if (!pendente || !CODIGO_SIMULADO.test(codigo)) {
         return false;
       }
+      const minhaGeracao = ++geracao.current;
       servico.definirToken(pendente.token);
       setUsuario(pendente.usuario);
+      if (manterConectado) {
+        armazenamento
+          .salvar(pendente)
+          .then(() => {
+            if (geracao.current !== minhaGeracao) {
+              return armazenamento.limpar();
+            }
+          })
+          .catch(() => {});
+      }
       setPendente(null);
       return true;
     },
-    [pendente, servico],
+    [pendente, servico, armazenamento],
   );
 
   const limparErro = useCallback(() => setErro(''), []);
 
   return useMemo(
-    () => ({usuario, verificando, erro, verificarCredenciais, confirmarCodigo, sair, limparErro}),
-    [usuario, verificando, erro, verificarCredenciais, confirmarCodigo, sair, limparErro],
+    () => ({
+      usuario,
+      restaurando,
+      verificando,
+      erro,
+      verificarCredenciais,
+      confirmarCodigo,
+      sair,
+      limparErro,
+    }),
+    [usuario, restaurando, verificando, erro, verificarCredenciais, confirmarCodigo, sair, limparErro],
   );
 }
 
@@ -101,11 +163,16 @@ const SessaoContexto = createContext<SessaoViewModel | null>(null);
 
 type ProviderProps = {
   servico?: ServicoAutenticacao;
+  armazenamento?: ArmazenamentoSessao;
   children: React.ReactNode;
 };
 
-export function SessaoProvider({servico = servicoAutenticacaoApi, children}: ProviderProps) {
-  const viewModel = useSessaoViewModel(servico);
+export function SessaoProvider({
+  servico = servicoAutenticacaoApi,
+  armazenamento = armazenamentoSessaoSeguro,
+  children,
+}: ProviderProps) {
+  const viewModel = useSessaoViewModel(servico, armazenamento);
   return <SessaoContexto.Provider value={viewModel}>{children}</SessaoContexto.Provider>;
 }
 

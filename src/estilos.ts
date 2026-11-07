@@ -444,6 +444,14 @@ export const estilos = StyleSheet.create({
   loginDivisor: {flexDirection: 'row', alignItems: 'center', gap: 12},
   loginDivisorLinha: {flex: 1, height: 1, backgroundColor: cores.borda},
   loginDivisorTexto: {color: cores.textoApoio, fontSize: 14, lineHeight: 20},
+  loginOpcao: {
+    minHeight: 48,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginTop: 8,
+  },
+  loginOpcaoTexto: {color: cores.textoForte, fontSize: 14, lineHeight: 20, fontWeight: '500'},
   loginBotaoContornado: {
     minHeight: 56,
     borderRadius: 28,
