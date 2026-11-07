@@ -101,6 +101,38 @@ function comprovanteValido(comprovante, status) {
   );
 }
 
+const ID_DE_ENVIO = /^[A-Za-z0-9_-]{8,80}$/;
+
+/** Corpo do envio de um comprovante coletado sem rede (POST .../paradas/:id/comprovante). */
+function validarEnvioDeComprovante(corpo) {
+  if (!corpo || typeof corpo !== 'object') {
+    return 'Envio inválido.';
+  }
+  if (typeof corpo.idEnvio !== 'string' || !ID_DE_ENVIO.test(corpo.idEnvio)) {
+    return 'Identificador de envio inválido.';
+  }
+  if (typeof corpo.coletadoPor !== 'string' || corpo.coletadoPor.length === 0 || corpo.coletadoPor.length > 80) {
+    return 'Informe a conta que coletou a assinatura.';
+  }
+  if (!textoValido(corpo.recebedor)) {
+    return 'Informe o nome do recebedor.';
+  }
+  if (
+    typeof corpo.assinatura !== 'string' ||
+    !corpo.assinatura.startsWith('data:image/png;base64,') ||
+    corpo.assinatura.length > ASSINATURA_MAX_BYTES
+  ) {
+    return 'Assinatura inválida: use PNG de até 512 KB.';
+  }
+  if (corpo.foto !== undefined && !fotoValida(corpo.foto)) {
+    return 'Foto inválida: use JPEG ou PNG de até 512 KB.';
+  }
+  if (corpo.coletadoEm !== undefined && !Number.isFinite(corpo.coletadoEm)) {
+    return 'Hora da coleta inválida.';
+  }
+  return null;
+}
+
 function coordenadasValidas({latitude, longitude}) {
   if (latitude === undefined && longitude === undefined) {
     return true;
@@ -376,6 +408,40 @@ function criarServidor({
             latitude,
             longitude,
           })),
+        });
+        return;
+      }
+
+      const comprovanteEncontrado = url.pathname.match(/^\/api\/rotas\/([^/]+)\/paradas\/([^/]+)\/comprovante$/);
+
+      if (requisicao.method === 'POST' && comprovanteEncontrado) {
+        const usuario = exigirUsuario(requisicao, ['motorista']);
+        const corpo = await lerJson(requisicao);
+        const erroEnvio = validarEnvioDeComprovante(corpo);
+        if (erroEnvio) {
+          responder(resposta, 400, {mensagem: erroEnvio});
+          return;
+        }
+        const resultado = repositorio.registrarComprovanteEnviado({
+          idEnvio: corpo.idEnvio,
+          rotaId: decodeURIComponent(comprovanteEncontrado[1]),
+          paradaId: decodeURIComponent(comprovanteEncontrado[2]),
+          usuarioId: usuario.id,
+          coletadoPor: corpo.coletadoPor,
+          recebedor: corpo.recebedor.trim(),
+          assinatura: corpo.assinatura,
+          foto: corpo.foto,
+          coletadoEm: corpo.coletadoEm,
+        });
+        if (resultado.resultado === 'rejeitado') {
+          responder(resposta, 409, {codigo: resultado.motivo, mensagem: resultado.mensagem});
+          return;
+        }
+        responder(resposta, 200, {
+          duplicado: resultado.resultado === 'duplicado',
+          recebidoEm: resultado.recebidoEm,
+          comprovante: resultado.comprovante,
+          statusDaRota: resultado.statusDaRota,
         });
         return;
       }

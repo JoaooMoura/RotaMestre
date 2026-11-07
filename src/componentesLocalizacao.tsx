@@ -1,5 +1,5 @@
 import React, {useEffect, useReducer} from 'react';
-import {Pressable, Text, View} from 'react-native';
+import {Keyboard, Pressable, Text, TextInput, TextInputProps, View} from 'react-native';
 import {MaterialDesignIcons} from '@react-native-vector-icons/material-design-icons';
 import {cores, estilos} from './estilos';
 import {descreverIdade, idadeMs, Posicao} from './localizacao';
@@ -148,6 +148,42 @@ export function IndicadorLocalizacaoConectado() {
           localizacao.abrirConfiguracoes(tipo === 'configuracoesDoAplicativo' ? 'aplicativo' : 'localizacao');
         }
       }}
+    />
+  );
+}
+
+/** Aviso de que a digitação está bloqueada porque o veículo está em movimento. */
+export function AvisoDeRestricao({restrito}: {restrito: boolean}) {
+  if (!restrito) {
+    return null;
+  }
+  return (
+    <View style={[estilos.localizacaoLinha, estilos.restricaoAviso]} accessibilityRole="alert" accessibilityLiveRegion="polite">
+      <MaterialDesignIcons name="car-brake-alert" size={24} color={cores.acentoTexto} />
+      <Text style={[estilos.textoApoio, estilos.flex]}>
+        Digitação bloqueada: veículo em movimento. Pare em local seguro para preencher.
+      </Text>
+    </View>
+  );
+}
+
+/**
+ * Campo de texto que não aceita digitação em movimento. Os botões e a orientação seguem acessíveis;
+ * o que já estava digitado é mantido. Ao entrar em movimento, o teclado é fechado.
+ */
+export function CampoDeTexto({restrito, style, ...resto}: TextInputProps & {restrito: boolean}) {
+  useEffect(() => {
+    if (restrito) {
+      Keyboard.dismiss();
+    }
+  }, [restrito]);
+  return (
+    <TextInput
+      {...resto}
+      editable={!restrito && resto.editable !== false}
+      style={[style, restrito && estilos.campoRestrito]}
+      accessibilityState={{disabled: restrito}}
+      accessibilityHint={restrito ? 'Indisponível com o veículo em movimento' : resto.accessibilityHint}
     />
   );
 }

@@ -148,6 +148,15 @@ export function useLocalizacao() {
   return useContext(LocalizacaoContexto).viewModel;
 }
 
+/**
+ * Digitação restrita porque o veículo está em movimento (US05.06). Sem localização atual (GPS
+ * desligado, perdido ou desatualizado) não dá para saber: a digitação fica liberada.
+ */
+export function useRestricaoPorMovimento() {
+  const {estado} = useLocalizacao();
+  return estado.tipo === 'ativa' && !estado.desatualizada && estado.restritoPorMovimento;
+}
+
 /** Posição atual: renderiza só quem a usa, a cada leitura. */
 export function usePosicaoAtual() {
   const {posicaoStore} = useContext(LocalizacaoContexto);

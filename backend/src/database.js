@@ -145,6 +145,35 @@ function criarRepositorio(caminhoBanco, {seedDemo = false} = {}) {
       FOREIGN KEY (rota_id) REFERENCES rotas(id) ON DELETE CASCADE
     );
 
+    -- Comprovantes coletados sem rede e enviados depois (US06.04). Cada envio tem um id gerado no
+    -- aparelho: repetir o mesmo id devolve o mesmo resultado, sem criar outro comprovante.
+    CREATE TABLE IF NOT EXISTS envios_comprovante (
+      id_envio TEXT PRIMARY KEY,
+      rota_id TEXT NOT NULL,
+      parada_id TEXT NOT NULL,
+      usuario_id TEXT NOT NULL,
+      resultado TEXT NOT NULL CHECK (resultado IN ('aceito', 'rejeitado')),
+      motivo TEXT,
+      recebido_em INTEGER NOT NULL
+    );
+
+    -- Envios que a regra da entrega não aceitou (rota reatribuída, parada já concluída...): o conteúdo
+    -- fica guardado, nunca é apagado nem aplicado à rota.
+    CREATE TABLE IF NOT EXISTS comprovantes_rejeitados (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      id_envio TEXT NOT NULL,
+      rota_id TEXT NOT NULL,
+      parada_id TEXT NOT NULL,
+      usuario_id TEXT NOT NULL,
+      coletado_por TEXT,
+      motivo TEXT NOT NULL,
+      recebedor TEXT NOT NULL,
+      assinatura TEXT NOT NULL,
+      foto TEXT,
+      coletado_em INTEGER,
+      recebido_em INTEGER NOT NULL
+    );
+
     CREATE TABLE IF NOT EXISTS trajetos (
       rota_id TEXT PRIMARY KEY,
       hash TEXT NOT NULL,
@@ -169,6 +198,41 @@ function criarRepositorio(caminhoBanco, {seedDemo = false} = {}) {
   ['telefone', 'cnh_numero', 'cnh_categoria', 'cnh_validade'].forEach(coluna =>
     adicionarColunaSeFaltar('motoristas', coluna),
   );
+
+  // `comprovantes_rejeitados` nasceu com o id do envio como chave e sem `coletado_por`. Bancos que já têm
+  // essa versão são reconstruídos (as linhas são preservadas): a chave nova permite guardar mais de uma
+  // tentativa rejeitada do mesmo envio sem conflito.
+  if (!tabelaTemColuna('comprovantes_rejeitados', 'coletado_por')) {
+    banco.exec('BEGIN IMMEDIATE');
+    try {
+      banco.exec(`
+        ALTER TABLE comprovantes_rejeitados RENAME TO comprovantes_rejeitados_antiga;
+        CREATE TABLE comprovantes_rejeitados (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          id_envio TEXT NOT NULL,
+          rota_id TEXT NOT NULL,
+          parada_id TEXT NOT NULL,
+          usuario_id TEXT NOT NULL,
+          coletado_por TEXT,
+          motivo TEXT NOT NULL,
+          recebedor TEXT NOT NULL,
+          assinatura TEXT NOT NULL,
+          foto TEXT,
+          coletado_em INTEGER,
+          recebido_em INTEGER NOT NULL
+        );
+        INSERT INTO comprovantes_rejeitados
+          (id_envio, rota_id, parada_id, usuario_id, coletado_por, motivo, recebedor, assinatura, foto, coletado_em, recebido_em)
+          SELECT id_envio, rota_id, parada_id, usuario_id, usuario_id, motivo, recebedor, assinatura, foto, coletado_em, recebido_em
+          FROM comprovantes_rejeitados_antiga;
+        DROP TABLE comprovantes_rejeitados_antiga;
+      `);
+      banco.exec('COMMIT');
+    } catch (erro) {
+      banco.exec('ROLLBACK');
+      throw erro;
+    }
+  }
 
   function migrarParaUsuarios() {
     banco.exec('PRAGMA foreign_keys = OFF');
@@ -531,6 +595,123 @@ function criarRepositorio(caminhoBanco, {seedDemo = false} = {}) {
     garantirDadosDemo();
   }
 
+  const MOTIVOS_DE_REJEICAO = {
+    ROTA_INEXISTENTE: 'A rota deste envio não existe mais.',
+    REATRIBUIDA:
+      'Esta rota não pertence a esta conta (foi reatribuída a outro motorista). A assinatura ficou guardada no servidor, sem ser aplicada.',
+    COLETADO_POR_OUTRO_USUARIO:
+      'Esta assinatura foi coletada em outra conta. Entre com a conta que a coletou para enviá-la; ela ficou guardada no servidor, sem ser aplicada.',
+    PARADA_INEXISTENTE: 'A parada deste envio não existe mais na rota.',
+    JA_CONCLUIDA: 'A parada já foi concluída por outro registro. A assinatura ficou guardada no servidor, sem ser aplicada.',
+  };
+
+  function dadosDoComprovante(rotaId, paradaId) {
+    const comprovante = banco
+      .prepare('SELECT recebedor, registrado_em FROM comprovantes WHERE rota_id = ? AND parada_id = ?')
+      .get(rotaId, paradaId);
+    const rota = banco.prepare('SELECT status FROM rotas WHERE id = ?').get(rotaId);
+    return {
+      comprovante: comprovante ? {recebedor: comprovante.recebedor, registradoEm: comprovante.registrado_em} : null,
+      statusDaRota: rota?.status ?? null,
+    };
+  }
+
+  /**
+   * Registra um comprovante coletado sem rede. Devolve `aceito`, `duplicado` (mesmo envio repetido,
+   * com o resultado que já tinha) ou `rejeitado` (conteúdo guardado à parte, motivo no resultado).
+   */
+  function registrarComprovanteEnviado(envio) {
+    const {idEnvio, rotaId, paradaId, usuarioId, coletadoPor, recebedor, assinatura, foto, coletadoEm} = envio;
+    banco.exec('BEGIN IMMEDIATE');
+    try {
+      // Só quem coletou a assinatura pode enviá-la. Outra conta logada no mesmo aparelho recebe a rejeição,
+      // o conteúdo fica guardado à parte e NÃO se cria registro de envio: o dono ainda pode enviar depois.
+      if (coletadoPor !== usuarioId) {
+        const agora = Date.now();
+        const repetido = banco
+          .prepare('SELECT 1 AS ja FROM comprovantes_rejeitados WHERE id_envio = ? AND usuario_id = ? AND motivo = ?')
+          .get(idEnvio, usuarioId, 'COLETADO_POR_OUTRO_USUARIO');
+        if (!repetido) {
+          banco
+            .prepare(`INSERT INTO comprovantes_rejeitados
+              (id_envio, rota_id, parada_id, usuario_id, coletado_por, motivo, recebedor, assinatura, foto, coletado_em, recebido_em)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+            .run(idEnvio, rotaId, paradaId, usuarioId, coletadoPor, 'COLETADO_POR_OUTRO_USUARIO', recebedor, assinatura, foto ?? null, coletadoEm ?? null, agora);
+        }
+        banco.exec('COMMIT');
+        return {resultado: 'rejeitado', motivo: 'COLETADO_POR_OUTRO_USUARIO', mensagem: MOTIVOS_DE_REJEICAO.COLETADO_POR_OUTRO_USUARIO};
+      }
+
+      const anterior = banco.prepare('SELECT * FROM envios_comprovante WHERE id_envio = ?').get(idEnvio);
+      if (anterior) {
+        banco.exec('COMMIT');
+        if (anterior.usuario_id !== usuarioId) {
+          // Mesmo id vindo de outro usuário: nunca devolve o resultado alheio.
+          return {resultado: 'rejeitado', motivo: 'ENVIO_DE_OUTRO_USUARIO', mensagem: 'Identificador de envio já usado.'};
+        }
+        if (anterior.rota_id !== rotaId || anterior.parada_id !== paradaId) {
+          return {resultado: 'rejeitado', motivo: 'ENVIO_CONFLITANTE', mensagem: 'Este identificador de envio já foi usado para outra parada.'};
+        }
+        return anterior.resultado === 'aceito'
+          ? {resultado: 'duplicado', recebidoEm: anterior.recebido_em, ...dadosDoComprovante(rotaId, paradaId)}
+          : {resultado: 'rejeitado', motivo: anterior.motivo, mensagem: MOTIVOS_DE_REJEICAO[anterior.motivo]};
+      }
+
+      const agora = Date.now();
+      const rota = banco.prepare('SELECT id, motorista_id, status FROM rotas WHERE id = ?').get(rotaId);
+      const parada = rota ? banco.prepare('SELECT status FROM paradas WHERE rota_id = ? AND id = ?').get(rotaId, paradaId) : null;
+      const jaTem =
+        rota && parada
+          ? banco.prepare('SELECT 1 AS tem FROM comprovantes WHERE rota_id = ? AND parada_id = ?').get(rotaId, paradaId)
+          : null;
+
+      let motivo = null;
+      if (!rota) {
+        motivo = 'ROTA_INEXISTENTE';
+      } else if (rota.motorista_id !== usuarioId) {
+        motivo = 'REATRIBUIDA';
+      } else if (!parada) {
+        motivo = 'PARADA_INEXISTENTE';
+      } else if (parada.status === 'Concluída' || jaTem) {
+        motivo = 'JA_CONCLUIDA';
+      }
+
+      if (motivo) {
+        banco
+          .prepare(`INSERT INTO comprovantes_rejeitados
+            (id_envio, rota_id, parada_id, usuario_id, coletado_por, motivo, recebedor, assinatura, foto, coletado_em, recebido_em)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+          .run(idEnvio, rotaId, paradaId, usuarioId, coletadoPor, motivo, recebedor, assinatura, foto ?? null, coletadoEm ?? null, agora);
+        banco
+          .prepare('INSERT INTO envios_comprovante (id_envio, rota_id, parada_id, usuario_id, resultado, motivo, recebido_em) VALUES (?, ?, ?, ?, ?, ?, ?)')
+          .run(idEnvio, rotaId, paradaId, usuarioId, 'rejeitado', motivo, agora);
+        banco.exec('COMMIT');
+        return {resultado: 'rejeitado', motivo, mensagem: MOTIVOS_DE_REJEICAO[motivo]};
+      }
+
+      // A hora da coleta vale (é quando a assinatura foi feita), desde que não seja do futuro.
+      const registradoEm = Number.isFinite(coletadoEm) && coletadoEm > 0 && coletadoEm <= agora + 60000 ? coletadoEm : agora;
+      banco.prepare("UPDATE paradas SET status = 'Concluída' WHERE rota_id = ? AND id = ?").run(rotaId, paradaId);
+      banco
+        .prepare('INSERT INTO comprovantes (rota_id, parada_id, recebedor, assinatura, foto, registrado_em) VALUES (?, ?, ?, ?, ?, ?)')
+        .run(rotaId, paradaId, recebedor, assinatura, foto ?? null, registradoEm);
+      const restantes = banco
+        .prepare("SELECT COUNT(*) AS n FROM paradas WHERE rota_id = ? AND status NOT IN ('Concluída', 'Não realizada')")
+        .get(rotaId).n;
+      if (restantes === 0) {
+        banco.prepare("UPDATE rotas SET status = 'Concluída' WHERE id = ?").run(rotaId);
+      }
+      banco
+        .prepare('INSERT INTO envios_comprovante (id_envio, rota_id, parada_id, usuario_id, resultado, motivo, recebido_em) VALUES (?, ?, ?, ?, ?, NULL, ?)')
+        .run(idEnvio, rotaId, paradaId, usuarioId, 'aceito', agora);
+      banco.exec('COMMIT');
+      return {resultado: 'aceito', recebidoEm: agora, ...dadosDoComprovante(rotaId, paradaId)};
+    } catch (erro) {
+      banco.exec('ROLLBACK');
+      throw erro;
+    }
+  }
+
   function criarGestor(gestor) {
     inserirUsuario({...gestor, papel: 'gestor'});
   }
@@ -542,6 +723,7 @@ function criarRepositorio(caminhoBanco, {seedDemo = false} = {}) {
     buscarRotaAtual,
     buscarTrajeto,
     buscarUsuario,
+    registrarComprovanteEnviado,
     listarMotoristas,
     salvarMotorista,
     salvarRota,

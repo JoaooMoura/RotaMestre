@@ -1,9 +1,11 @@
-import React from 'react';
-import {Pressable, Text, View} from 'react-native';
+import React, {useEffect, useMemo, useState} from 'react';
+import {Pressable, ScrollView, Text, View} from 'react-native';
 import {MaterialDesignIcons} from '@react-native-vector-icons/material-design-icons';
 import {cores, estilos} from './estilos';
 import {formatarDistancia, formatarDuracao} from './mapa';
-import {GuiaDeNavegacao} from './navegacao';
+import {criarPlano, GuiaDeNavegacao} from './navegacao';
+import {calcularPrevisoes, formatarHorario, PrevisaoDeParada} from './previsao';
+import {Trajeto} from './tipos';
 import {EstadoDaVoz} from './viewmodels/guiaDeNavegacao';
 import {NavegacaoViewModel, useGuiaDeNavegacao} from './viewmodels/NavegacaoViewModel';
 
@@ -189,4 +191,85 @@ export function PainelDeNavegacaoConectado({navegacao}: {navegacao: NavegacaoVie
       aoInstalarVoz={navegacao.instalarVozes}
     />
   );
+}
+
+type PrevisaoProps = {
+  previsoes: PrevisaoDeParada[];
+  /** `true` quando a navegação ainda não começou: a previsão supõe sair agora. */
+  suposicaoDePartida: boolean;
+};
+
+/** Horário previsto de chegada a cada parada restante, sempre identificado como estimativa. */
+export function PrevisaoDeChegada({previsoes, suposicaoDePartida}: PrevisaoProps) {
+  const [aberta, setAberta] = useState(false);
+  if (previsoes.length === 0) {
+    return <Text style={estilos.textoApoio}>Todas as paradas foram concluídas.</Text>;
+  }
+  const proxima = previsoes[0];
+  const final = previsoes[previsoes.length - 1];
+  const texto = (p: PrevisaoDeParada) => (p.chegadaEm === null ? 'sem estimativa' : formatarHorario(p.chegadaEm));
+  const resumo = `Próxima parada ${proxima.numero}: ${texto(proxima)}${previsoes.length > 1 ? ` • Final: ${texto(final)}` : ''}`;
+  return (
+    <View>
+      <Text style={estilos.mapaPainelTitulo} accessibilityLabel={`Previsão de chegada. ${resumo}`}>
+        {resumo}
+      </Text>
+      <Text style={estilos.textoApoio}>
+        Previsão estimada{suposicaoDePartida ? ', saindo agora' : ''}. Não considera o trânsito em tempo real.
+      </Text>
+      {previsoes.length > 1 ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityState={{expanded: aberta}}
+          accessibilityLabel={aberta ? 'Esconder previsões por parada' : 'Ver previsões por parada'}
+          style={estilos.localizacaoAcao}
+          onPress={() => setAberta(valor => !valor)}>
+          <Text style={estilos.localizacaoAcaoTexto}>{aberta ? 'Esconder previsões' : 'Ver previsões por parada'}</Text>
+        </Pressable>
+      ) : null}
+      {aberta ? (
+        <ScrollView style={estilos.previsaoLista} nestedScrollEnabled>
+          {previsoes.map(p => (
+            <View
+              key={p.paradaId}
+              accessible
+              style={estilos.previsaoLinha}
+              accessibilityLabel={`Parada ${p.numero}, ${p.destinatario}, previsão ${texto(p)}${
+                p.chegadaEm === null ? '' : `, a ${formatarDistancia(p.distanciaM)}`
+              }`}>
+              <Text style={estilos.previsaoHorario}>{texto(p)}</Text>
+              <Text style={[estilos.textoApoio, estilos.flex]} numberOfLines={1}>
+                {p.numero}. {p.destinatario}
+              </Text>
+            </View>
+          ))}
+        </ScrollView>
+      ) : null}
+    </View>
+  );
+}
+
+const ATUALIZACAO_DA_PREVISAO_MS = 30_000;
+const DEGRAU_DO_PROGRESSO_M = 25;
+
+/**
+ * Previsão ligada ao trajeto e ao progresso da navegação. Só este componente reage ao guia; o
+ * cálculo é refeito a cada 25 m andados, a cada 30 s ou quando o trajeto muda (recálculo).
+ */
+export function PrevisaoDeChegadaConectada({trajeto, navegacao}: {trajeto: Trajeto; navegacao: NavegacaoViewModel}) {
+  const guia = useGuiaDeNavegacao(navegacao);
+  const [relogio, setRelogio] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setRelogio(Date.now()), ATUALIZACAO_DA_PREVISAO_MS);
+    return () => clearInterval(id);
+  }, []);
+  const plano = useMemo(() => criarPlano(trajeto), [trajeto]);
+  const degrau = Math.floor((guia?.progressoM ?? 0) / DEGRAU_DO_PROGRESSO_M);
+  const previsoes = useMemo(
+    () => calcularPrevisoes(plano, trajeto.paradas, degrau * DEGRAU_DO_PROGRESSO_M, Date.now()),
+    // `relogio` só dispara a reavaliação periódica; o instante usado é o de agora.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [plano, trajeto.paradas, degrau, relogio],
+  );
+  return <PrevisaoDeChegada previsoes={previsoes} suposicaoDePartida={guia === null} />;
 }

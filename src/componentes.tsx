@@ -75,7 +75,7 @@ export function Cabecalho({titulo, subtitulo, onVoltar}: CabecalhoProps) {
           ) : null}
         </View>
         {onVoltar ? (
-          <Pressable onPress={onVoltar}>
+          <Pressable accessibilityRole="button" style={estilos.voltarAlvo} onPress={onVoltar}>
             <Text style={estilos.voltar}>Voltar</Text>
           </Pressable>
         ) : null}
@@ -106,9 +106,11 @@ type CardParadaProps = {
   parada: Parada;
   indice: number;
   onPress?: () => void;
+  /** A assinatura desta parada está guardada no aparelho e ainda não foi aceita pelo servidor. */
+  aguardandoEnvio?: boolean;
 };
 
-export function CardParada({parada, indice, onPress}: CardParadaProps) {
+export function CardParada({parada, indice, onPress, aguardandoEnvio}: CardParadaProps) {
   const conteudo = (
     <View style={[estilos.card, estilos.linha]}>
       <View style={estilos.paradaNumero}>
@@ -124,6 +126,12 @@ export function CardParada({parada, indice, onPress}: CardParadaProps) {
         </Text>
         <Text style={estilos.texto}>{parada.endereco}</Text>
         <Text style={[estilos.texto, estilos.margemTopo4]}>{parada.janela}</Text>
+        {aguardandoEnvio ? (
+          <View style={[estilos.etiqueta, estilos.margemTopo4]} accessible accessibilityLabel="Assinatura guardada no aparelho, aguardando envio ao servidor">
+            <MaterialDesignIcons name="cloud-upload-outline" size={20} color={cores.acentoTexto} />
+            <Text style={[estilos.etiquetaTexto, {color: cores.acentoTexto}]}>Aguardando envio</Text>
+          </View>
+        ) : null}
       </View>
     </View>
   );

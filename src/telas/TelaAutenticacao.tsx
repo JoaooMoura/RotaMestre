@@ -18,6 +18,7 @@ import {
 } from '../componentes';
 import {cores, estilos} from '../estilos';
 import {cadastrarMotorista} from '../servicos/api';
+import {formatarDataEHora} from '../offline';
 import {useSessao} from '../viewmodels/SessaoViewModel';
 
 type Etapa =
@@ -32,7 +33,15 @@ type Etapa =
 
 const TOTAL_ETAPAS_CADASTRO = 3;
 
-export function TelaAutenticacao() {
+type TelaAutenticacaoProps = {
+  /** Há rota baixada neste aparelho: oferece abri-la sem entrar (PV05). */
+  rotaBaixada?: {rotaNome: string; baixadoEm: number} | null;
+  /** O aparelho guarda a sessão deste motorista (Manter conectado): dá para coletar assinaturas sem entrar. */
+  podeColetarSemEntrar?: boolean;
+  aoAbrirRotaBaixada?: () => void;
+};
+
+export function TelaAutenticacao({rotaBaixada, podeColetarSemEntrar, aoAbrirRotaBaixada}: TelaAutenticacaoProps = {}) {
   const sessao = useSessao();
   const [etapa, setEtapa] = useState<Etapa>('splash');
   const [email, setEmail] = useState('');
@@ -395,6 +404,16 @@ export function TelaAutenticacao() {
         <View style={estilos.loginDivisorLinha} />
       </View>
       <BotaoContornado titulo="Criar conta de motorista" onPress={() => setEtapa('cadastro1')} />
+      {rotaBaixada && aoAbrirRotaBaixada ? (
+        <>
+          <BotaoContornado titulo="Consultar rota baixada" icone="cloud-download-outline" onPress={aoAbrirRotaBaixada} />
+          <Text style={estilos.textoApoio}>
+            {podeColetarSemEntrar
+              ? `Sem entrar: consulta a rota e coleta assinaturas, pois este aparelho guarda a sua sessão (baixada em ${formatarDataEHora(rotaBaixada.baixadoEm)}). Para enviar, entre com seu acesso.`
+              : `Sem entrar: somente leitura (rota, mapa e navegação; baixada em ${formatarDataEHora(rotaBaixada.baixadoEm)}). Para coletar assinaturas, entre na conta.`}
+          </Text>
+        </>
+      ) : null}
     </LayoutAutenticacao>
   );
 }

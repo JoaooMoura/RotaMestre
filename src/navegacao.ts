@@ -148,6 +148,8 @@ export type EstadoDeNavegacao = {
 };
 
 export type GuiaDeNavegacao = {
+  /** Distância já percorrida ao longo da rota. */
+  progressoM: number;
   manobra: ManobraPlanejada | null;
   seguinte: ManobraPlanejada | null;
   distanciaAteManobraM: number;
@@ -177,6 +179,7 @@ function montarGuia(plano: PlanoDeNavegacao, estado: EstadoDeNavegacao, distanci
   const progresso = estado.progressoM ?? 0;
   const restanteM = Math.max(0, plano.totalM - progresso);
   return {
+    progressoM: progresso,
     manobra,
     seguinte: plano.manobras[estado.proximaManobra + 1] ?? null,
     distanciaAteManobraM: manobra ? Math.max(0, manobra.posicaoM - progresso) : 0,

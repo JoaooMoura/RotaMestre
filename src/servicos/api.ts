@@ -4,7 +4,12 @@ import {Motorista, NovoMotorista, Rota, Sessao, Trajeto} from '../tipos';
 export const SEM_CONEXAO = 0;
 
 export class ErroApi extends Error {
-  constructor(mensagem: string, readonly status: number) {
+  constructor(
+    mensagem: string,
+    readonly status: number,
+    /** Código de negócio informado pelo servidor (ex.: REATRIBUIDA), quando há. */
+    readonly codigo?: string,
+  ) {
     super(mensagem);
   }
 }
@@ -48,7 +53,11 @@ async function requisicao<T>(caminho: string, opcoes?: RequestInit): Promise<T> 
     if (resposta.status === 401 && tokenEnviado) {
       aoExpirar?.();
     }
-    throw new ErroApi(corpo.mensagem || 'Não foi possível acessar o servidor.', resposta.status);
+    throw new ErroApi(
+      corpo.mensagem || 'Não foi possível acessar o servidor.',
+      resposta.status,
+      typeof corpo.codigo === 'string' ? corpo.codigo : undefined,
+    );
   }
 
   return corpo as T;
@@ -93,4 +102,39 @@ export function salvarRota(rota: Rota) {
     method: 'PUT',
     body: JSON.stringify(rota),
   });
+}
+
+/** O servidor responde? Usado para saber se já dá para sincronizar (a rede do aparelho pode estar ligada sem o servidor). */
+export async function verificarSaude(): Promise<boolean> {
+  try {
+    await requisicao<{status: string}>('/health');
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export type EnvioDeComprovante = {
+  idEnvio: string;
+  recebedor: string;
+  assinatura: string;
+  foto?: string;
+  coletadoEm: number;
+  /** Conta que coletou a assinatura: só ela pode enviá-la (o servidor confere com o login). */
+  coletadoPor: string;
+};
+
+export type RespostaDoEnvio = {
+  duplicado: boolean;
+  recebidoEm: number;
+  comprovante: {recebedor: string; registradoEm: number};
+  statusDaRota: string;
+};
+
+/** Envia um comprovante coletado sem rede. Repetir o mesmo `idEnvio` não cria outro comprovante. */
+export function enviarComprovante(rotaId: string, paradaId: string, envio: EnvioDeComprovante) {
+  return requisicao<RespostaDoEnvio>(
+    `/rotas/${encodeURIComponent(rotaId)}/paradas/${encodeURIComponent(paradaId)}/comprovante`,
+    {method: 'POST', body: JSON.stringify(envio)},
+  );
 }

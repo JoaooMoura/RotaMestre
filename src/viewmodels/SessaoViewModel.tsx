@@ -25,6 +25,11 @@ export const servicoAutenticacaoApi: ServicoAutenticacao = {
 
 export type SessaoViewModel = {
   usuario: Usuario | null;
+  /**
+   * Quem estava com "Manter conectado" neste aparelho, mas com o token vencido. Não é login (nada vai ao
+   * servidor), só identifica o dono para coletar assinaturas sem rede. Some ao sair da conta.
+   */
+  usuarioGuardado: Usuario | null;
   restaurando: boolean;
   verificando: boolean;
   erro: string;
@@ -48,6 +53,7 @@ export function useSessaoViewModel(
   armazenamento: ArmazenamentoSessao,
 ): SessaoViewModel {
   const [usuario, setUsuario] = useState<Usuario | null>(null);
+  const [usuarioGuardado, setUsuarioGuardado] = useState<Usuario | null>(null);
   const [pendente, setPendente] = useState<Sessao | null>(null);
   const [restaurando, setRestaurando] = useState(true);
   const [verificando, setVerificando] = useState(false);
@@ -59,8 +65,18 @@ export function useSessaoViewModel(
     servico.definirToken(null);
     setPendente(null);
     setUsuario(null);
+    setUsuarioGuardado(null);
     armazenamento.limpar().catch(() => {});
   }, [servico, armazenamento]);
+
+  /** Troca a sessão guardada por uma só com a identidade: o token vencido é descartado, o dono continua conhecido. */
+  const guardarSoIdentidade = useCallback(
+    async (salva: Sessao) => {
+      setUsuarioGuardado(salva.usuario);
+      await armazenamento.salvar({...salva, token: '', expiraEm: 0}).catch(() => {});
+    },
+    [armazenamento],
+  );
 
   useEffect(() => {
     const geracaoInicial = geracao.current;
@@ -75,7 +91,7 @@ export function useSessaoViewModel(
           servico.definirToken(salva.token);
           setUsuario(salva.usuario);
         } else if (salva) {
-          await armazenamento.limpar();
+          await guardarSoIdentidade(salva);
         }
       } catch {
         await armazenamento.limpar().catch(() => {});
@@ -85,15 +101,29 @@ export function useSessaoViewModel(
     }
 
     restaurar();
-  }, [servico, armazenamento]);
+  }, [servico, armazenamento, guardarSoIdentidade]);
 
   useEffect(
     () =>
       servico.aoExpirarSessao(() => {
-        sair();
+        // O token venceu no meio do uso: volta ao login, mas se o aparelho guardava a sessão, o dono continua
+        // conhecido (para coletar assinaturas sem rede). Sem sessão guardada, não sobra nada.
+        const minhaGeracao = ++geracao.current;
+        servico.definirToken(null);
+        setPendente(null);
+        setUsuario(null);
+        armazenamento
+          .ler()
+          .then(salva => {
+            if (geracao.current !== minhaGeracao) {
+              return undefined;
+            }
+            return salva ? guardarSoIdentidade(salva) : undefined;
+          })
+          .catch(() => {});
         setErro('Sessão expirada. Entre novamente.');
       }),
-    [servico, sair],
+    [servico, armazenamento, guardarSoIdentidade],
   );
 
   const verificarCredenciais = useCallback(
@@ -126,6 +156,7 @@ export function useSessaoViewModel(
       const minhaGeracao = ++geracao.current;
       servico.definirToken(pendente.token);
       setUsuario(pendente.usuario);
+      setUsuarioGuardado(null);
       if (manterConectado) {
         armazenamento
           .salvar(pendente)
@@ -147,6 +178,7 @@ export function useSessaoViewModel(
   return useMemo(
     () => ({
       usuario,
+      usuarioGuardado,
       restaurando,
       verificando,
       erro,
@@ -155,7 +187,7 @@ export function useSessaoViewModel(
       sair,
       limparErro,
     }),
-    [usuario, restaurando, verificando, erro, verificarCredenciais, confirmarCodigo, sair, limparErro],
+    [usuario, usuarioGuardado, restaurando, verificando, erro, verificarCredenciais, confirmarCodigo, sair, limparErro],
   );
 }
 

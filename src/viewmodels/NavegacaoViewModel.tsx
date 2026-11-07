@@ -1,5 +1,6 @@
 import React, {createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore} from 'react';
 import {GuiaDeNavegacao, criarPlano} from '../navegacao';
+import {ServicoTela, servicoTelaNulo} from '../servicos/telaTipos';
 import {ServicoVoz, servicoVozNulo} from '../servicos/vozTipos';
 import {Trajeto} from '../tipos';
 import {EstadoDaVoz, estadoInicialDaVoz, Guia, iniciarGuia} from './guiaDeNavegacao';
@@ -25,18 +26,18 @@ export type NavegacaoViewModel = {
   instalarVozes: () => void;
 };
 
-type DependenciasNavegacao = {voz: ServicoVoz};
+type DependenciasNavegacao = {voz: ServicoVoz; tela?: ServicoTela};
 
-const NavegacaoContexto = createContext<DependenciasNavegacao>({voz: servicoVozNulo});
+const NavegacaoContexto = createContext<DependenciasNavegacao>({voz: servicoVozNulo, tela: servicoTelaNulo});
 
-export function NavegacaoProvider({voz, children}: {voz: ServicoVoz; children: React.ReactNode}) {
-  const valor = useMemo(() => ({voz}), [voz]);
+export function NavegacaoProvider({voz, tela, children}: {voz: ServicoVoz; tela?: ServicoTela; children: React.ReactNode}) {
+  const valor = useMemo(() => ({voz, tela}), [voz, tela]);
   return <NavegacaoContexto.Provider value={valor}>{children}</NavegacaoContexto.Provider>;
 }
 
 export function useNavegacaoViewModel(trajeto: Trajeto, dependencias?: DependenciasNavegacao): NavegacaoViewModel {
   const contexto = useContext(NavegacaoContexto);
-  const {voz} = dependencias ?? contexto;
+  const {voz, tela = servicoTelaNulo} = dependencias ?? contexto;
   const localizacao = useLocalizacao();
   const posicaoStore = useStoreDaPosicao();
 
@@ -90,6 +91,15 @@ export function useNavegacaoViewModel(trajeto: Trajeto, dependencias?: Dependenc
   }, [navegando, localizacaoPerdida]);
 
   useEffect(() => () => guiaRef.current?.parar(), []);
+
+  // A tela fica acesa só enquanto a navegação está ativa; ao encerrar ou sair da tela, é liberada.
+  useEffect(() => {
+    if (!navegando) {
+      return undefined;
+    }
+    tela.manterAcesa();
+    return () => tela.liberar();
+  }, [navegando, tela]);
 
   const alternarVoz = useCallback(() => {
     ligadaRef.current = !ligadaRef.current;

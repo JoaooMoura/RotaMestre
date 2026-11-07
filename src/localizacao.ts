@@ -74,6 +74,31 @@ export function proximoModo(estado: EstadoDoModo, leitura: LeituraBruta, velocid
   return velocidade >= limiarMovimentoKmh && precisaoBoa ? {modo: 'emMovimento', leiturasLentas: 0} : estado;
 }
 
+/**
+ * Restrição de digitação (US05.06). Liga com 1 leitura a partir de 8 km/h (precisão aceitável) e só
+ * desliga após 3 leituras seguidas abaixo de 2 km/h: os mesmos limiares do modo de coleta.
+ * Sem velocidade conhecida, o estado não muda (nunca inventa movimento nem parada).
+ */
+export type EstadoDaRestricao = {restrito: boolean; leiturasLentas: number};
+
+export const ESTADO_INICIAL_DA_RESTRICAO: EstadoDaRestricao = {restrito: false, leiturasLentas: 0};
+
+export function proximaRestricao(estado: EstadoDaRestricao, leitura: LeituraBruta, velocidade: number | null): EstadoDaRestricao {
+  const {limiarParadoKmh, limiarMovimentoKmh, leiturasParaParar, precisaoMaximaParaMovimentoM} = POLITICA_LOCALIZACAO;
+  if (velocidade === null) {
+    return estado;
+  }
+  if (!estado.restrito) {
+    const precisaoBoa = leitura.precisaoM === null || leitura.precisaoM <= precisaoMaximaParaMovimentoM;
+    return velocidade >= limiarMovimentoKmh && precisaoBoa ? {restrito: true, leiturasLentas: 0} : estado;
+  }
+  if (velocidade >= limiarParadoKmh) {
+    return estado.leiturasLentas === 0 ? estado : {restrito: true, leiturasLentas: 0};
+  }
+  const leiturasLentas = estado.leiturasLentas + 1;
+  return leiturasLentas >= leiturasParaParar ? ESTADO_INICIAL_DA_RESTRICAO : {restrito: true, leiturasLentas};
+}
+
 export const intervaloDoModo = (modo: ModoColeta) => POLITICA_LOCALIZACAO.intervaloMs[modo];
 
 export const idadeMs = (posicao: Posicao, agora: number) => Math.max(0, agora - posicao.recebidaEm);

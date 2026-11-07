@@ -1,11 +1,13 @@
 import {
   estaDesatualizada,
+  ESTADO_INICIAL_DA_RESTRICAO,
   ESTADO_INICIAL_DO_MODO,
   intervaloDoModo,
   LeituraBruta,
   ModoColeta,
   POLITICA_LOCALIZACAO,
   Posicao,
+  proximaRestricao,
   proximoModo,
   temBaixaPrecisao,
   velocidadeKmh,
@@ -25,7 +27,7 @@ export type EstadoLocalizacao =
   | {tipo: 'permissaoAproximada'}
   | {tipo: 'gpsIndisponivel'}
   | {tipo: 'aguardandoPosicao'; semSinal: boolean}
-  | {tipo: 'ativa'; modo: ModoColeta; desatualizada: boolean; baixaPrecisao: boolean};
+  | {tipo: 'ativa'; modo: ModoColeta; desatualizada: boolean; baixaPrecisao: boolean; restritoPorMovimento: boolean};
 
 export type Store<T> = {
   obter: () => T;
@@ -107,6 +109,7 @@ export function iniciarRastreamento(parametros: ParametrosRastreamento): {parar:
   let coleta: Coleta | null = null;
   let geracaoDaColeta = 0;
   let estadoDoModo = ESTADO_INICIAL_DO_MODO;
+  let estadoDaRestricao = ESTADO_INICIAL_DA_RESTRICAO;
   let leituraAnterior: LeituraBruta | null = null;
   let recebeuPosicao = false;
   let gpsComErro = false;
@@ -172,6 +175,7 @@ export function iniciarRastreamento(parametros: ParametrosRastreamento): {parar:
     const novoModo = proximoModo(estadoDoModo, leitura, velocidade);
     const trocouDeModo = novoModo.modo !== estadoDoModo.modo;
     estadoDoModo = novoModo;
+    estadoDaRestricao = proximaRestricao(estadoDaRestricao, leitura, velocidade);
     leituraAnterior = leitura;
     recebeuPosicao = true;
     gpsComErro = false;
@@ -188,6 +192,7 @@ export function iniciarRastreamento(parametros: ParametrosRastreamento): {parar:
       modo: estadoDoModo.modo,
       desatualizada: false,
       baixaPrecisao: temBaixaPrecisao(posicao),
+      restritoPorMovimento: estadoDaRestricao.restrito,
     });
   }
 

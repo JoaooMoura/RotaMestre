@@ -6,7 +6,6 @@ import {
   ScrollView,
   StatusBar,
   Text,
-  TextInput,
   View,
 } from 'react-native';
 import {MaterialDesignIcons} from '@react-native-vector-icons/material-design-icons';
@@ -28,7 +27,11 @@ import {notificacoesIniciais} from '../dados';
 import {cores, estilos} from '../estilos';
 import {primeiroNome} from '../nomes';
 import {Comprovante, Parada, Rota, StatusParada, TipoParada, Usuario} from '../tipos';
-import {IndicadorLocalizacaoConectado} from '../componentesLocalizacao';
+import {AvisoDeRestricao, CampoDeTexto, IndicadorLocalizacaoConectado} from '../componentesLocalizacao';
+import {useRestricaoPorMovimento} from '../viewmodels/LocalizacaoViewModel';
+import {MENSAGEM_ENTRAR_PARA_COLETAR} from '../offline';
+import {useOffline} from '../viewmodels/OfflineViewModel';
+import {AvisoSemConexaoConectado, CartaoDeDownloadConectado, PainelDeEnviosConectado} from '../componentesOffline';
 import {TelaMapa} from './TelaMapa';
 import SignatureScreen, {SignatureViewRef} from 'react-native-signature-canvas';
 import {
@@ -102,6 +105,9 @@ export function TelaMotorista({usuario, rota, onAtualizarRota, onSair}: Props) {
   const envioEmAndamento = React.useRef(false);
   const [rolagemAtiva, setRolagemAtiva] = useState(true);
   const signatureRef = React.useRef<SignatureViewRef>(null);
+  const digitacaoRestrita = useRestricaoPorMovimento();
+  const offline = useOffline();
+  const aguardandoEnvio = new Set(offline.pendencias.filter(p => p.status !== 'rejeitada').map(p => p.paradaId));
 
   const paradaSelecionada =
     rota.paradas.find(item => item.id === paradaId) ?? rota.paradas[0];
@@ -207,6 +213,7 @@ export function TelaMotorista({usuario, rota, onAtualizarRota, onSair}: Props) {
         <ScrollView style={estilos.tela} keyboardShouldPersistTaps="handled">
           <Cabecalho titulo="Adicionar parada" onVoltar={() => setFluxo('pausada')} />
           <View style={estilos.conteudo}>
+            <AvisoDeRestricao restrito={digitacaoRestrita} />
             <Text style={estilos.rotulo}>Tipo</Text>
             <View style={estilos.linha}>
               {(['Coleta', 'Entrega'] as TipoParada[]).map(item => (
@@ -224,11 +231,12 @@ export function TelaMotorista({usuario, rota, onAtualizarRota, onSair}: Props) {
               ))}
             </View>
             <Text style={estilos.rotulo}>Cliente ou destinatário</Text>
-            <TextInput style={estilos.input} value={destinatario} onChangeText={setDestinatario} />
+            <CampoDeTexto restrito={digitacaoRestrita} style={estilos.input} value={destinatario} onChangeText={setDestinatario} />
             <Text style={estilos.rotulo}>Endereço</Text>
-            <TextInput style={estilos.input} value={endereco} onChangeText={setEndereco} />
+            <CampoDeTexto restrito={digitacaoRestrita} style={estilos.input} value={endereco} onChangeText={setEndereco} />
             <Text style={estilos.rotulo}>Observação</Text>
-            <TextInput
+            <CampoDeTexto
+              restrito={digitacaoRestrita}
               style={[estilos.input, estilos.inputMultilinha]}
               value={observacao}
               onChangeText={setObservacao}
@@ -339,9 +347,10 @@ export function TelaMotorista({usuario, rota, onAtualizarRota, onSair}: Props) {
               <Text style={estilos.rotulo}>Observações</Text>
               <Text style={estilos.texto}>{paradaSelecionada.observacao || 'Sem observações'}</Text>
             </View>
+            {offline.somenteLeitura ? <Text style={estilos.textoApoio}>{MENSAGEM_ENTRAR_PARA_COLETAR}</Text> : null}
             <Botao
               titulo="Confirmar chegada"
-              desabilitado={paradaSelecionada.status === 'Concluída'}
+              desabilitado={paradaSelecionada.status === 'Concluída' || offline.somenteLeitura}
               onPress={() => setFluxo('verificar')}
             />
           </View>
@@ -374,6 +383,7 @@ export function TelaMotorista({usuario, rota, onAtualizarRota, onSair}: Props) {
         <ScrollView style={estilos.tela}>
           <Cabecalho titulo="Atualizar entrega" onVoltar={() => setFluxo('detalhe')} />
           <View style={estilos.conteudo}>
+            {statusEscolhido === 'Não realizada' ? <AvisoDeRestricao restrito={digitacaoRestrita} /> : null}
             {(['Em andamento', 'Concluída', 'Não realizada'] as StatusParada[]).map(item => (
               <Pressable
                 key={item}
@@ -383,13 +393,14 @@ export function TelaMotorista({usuario, rota, onAtualizarRota, onSair}: Props) {
               </Pressable>
             ))}
             {statusEscolhido === 'Não realizada' ? (
-              <TextInput
+              <CampoDeTexto
+                restrito={digitacaoRestrita}
                 style={[estilos.input, estilos.inputMultilinha]}
                 value={motivo}
                 onChangeText={setMotivo}
                 multiline
                 placeholder="Motivo da não realização"
-                placeholderTextColor="#94A3B8"
+                placeholderTextColor={cores.contorno}
               />
             ) : null}
             <Botao
@@ -414,8 +425,9 @@ export function TelaMotorista({usuario, rota, onAtualizarRota, onSair}: Props) {
         <ScrollView style={estilos.tela} scrollEnabled={rolagemAtiva}>
           <Cabecalho titulo="Assinatura do recebedor" onVoltar={() => setFluxo('status')} />
           <View style={estilos.conteudo}>
+            <AvisoDeRestricao restrito={digitacaoRestrita} />
             <Text style={estilos.rotulo}>Nome do recebedor</Text>
-            <TextInput style={estilos.input} value={nomeRecebedor} onChangeText={setNomeRecebedor} />
+            <CampoDeTexto restrito={digitacaoRestrita} style={estilos.input} value={nomeRecebedor} onChangeText={setNomeRecebedor} />
             {assinatura ? (
               <View style={estilos.assinaturaCanvas}>
                 <Image source={{uri: assinatura}} style={estilos.assinaturaPreview} />
@@ -473,9 +485,14 @@ export function TelaMotorista({usuario, rota, onAtualizarRota, onSair}: Props) {
             ) : (
               <Botao titulo="Escolher da galeria" secundario onPress={() => anexarFoto('galeria')} />
             )}
+            {offline.semConexao ? (
+              <Text style={estilos.textoApoio}>
+                Sem conexão: a foto é opcional. A assinatura fica guardada neste aparelho e será enviada quando a conexão voltar.
+              </Text>
+            ) : null}
             <Botao
-              titulo={enviandoEntrega ? 'Enviando...' : 'Confirmar entrega'}
-              desabilitado={!foto || enviandoEntrega}
+              titulo={enviandoEntrega ? (offline.semConexao ? 'Guardando...' : 'Enviando...') : offline.semConexao ? 'Guardar para enviar depois' : 'Confirmar entrega'}
+              desabilitado={(!foto && !offline.semConexao) || enviandoEntrega}
               onPress={confirmarEntrega}
             />
           </View>
@@ -489,9 +506,13 @@ export function TelaMotorista({usuario, rota, onAtualizarRota, onSair}: Props) {
           <View style={estilos.sucessoIcone}>
             <Text style={estilos.sucessoIconeTexto}>✓</Text>
           </View>
-          <Text style={[estilos.titulo, estilos.textoCentral]}>Entrega registrada</Text>
+          <Text style={[estilos.titulo, estilos.textoCentral]}>
+            {offline.semConexao ? 'Assinatura guardada' : 'Entrega registrada'}
+          </Text>
           <Text style={[estilos.subtitulo, estilos.textoCentral]}>
-            {paradaSelecionada?.destinatario} foi marcada como concluída.
+            {offline.semConexao
+              ? `A assinatura de ${paradaSelecionada?.destinatario} está guardada neste aparelho e será enviada quando a conexão voltar. O servidor ainda não confirmou o recebimento.`
+              : `${paradaSelecionada?.destinatario} foi marcada como concluída.`}
           </Text>
           <View style={estilos.larguraTotalTopo18}>
             <Botao
@@ -520,14 +541,24 @@ export function TelaMotorista({usuario, rota, onAtualizarRota, onSair}: Props) {
                 <Badge status={rota.status} />
               </View>
               <Text style={estilos.rotulo}>Progresso</Text>
-              <Text style={estilos.texto}>{concluidas} concluídas e {rota.paradas.length - concluidas} restantes</Text>
+              <Text style={estilos.texto}>{concluidas} {concluidas === 1 ? 'concluída' : 'concluídas'} e {rota.paradas.length - concluidas}{' '}
+                {rota.paradas.length - concluidas === 1 ? 'restante' : 'restantes'}</Text>
               <View style={estilos.progressoFundo}>
                 <View style={[estilos.progresso, {width: `${progresso}%`}]} />
               </View>
             </View>
+            <AvisoSemConexaoConectado />
             <IndicadorLocalizacaoConectado />
+            <PainelDeEnviosConectado />
+            <CartaoDeDownloadConectado rotaId={rota.id} />
             {rota.paradas.map((parada, indice) => (
-              <CardParada key={parada.id} parada={parada} indice={indice} onPress={() => abrirParada(parada)} />
+              <CardParada
+                key={parada.id}
+                parada={parada}
+                indice={indice}
+                aguardandoEnvio={aguardandoEnvio.has(parada.id)}
+                onPress={() => abrirParada(parada)}
+              />
             ))}
             <BotaoContornado titulo="Ver no mapa" icone="map-outline" onPress={() => setFluxo('mapa')} />
             {ativa ? (

@@ -3,8 +3,9 @@ import {ActivityIndicator, Text, View} from 'react-native';
 import {Camera, CameraRef, GeoJSONSource, Layer, Map, Marker} from '@maplibre/maplibre-react-native';
 import {MaterialDesignIcons} from '@react-native-vector-icons/material-design-icons';
 import {Botao, BotaoPrincipal, Cabecalho} from '../componentes';
-import {FaixaDaManobraConectada, PainelDeNavegacaoConectado} from '../componentesNavegacao';
+import {FaixaDaManobraConectada, PainelDeNavegacaoConectado, PrevisaoDeChegadaConectada} from '../componentesNavegacao';
 import {IndicadorLocalizacaoConectado} from '../componentesLocalizacao';
+import {AvisoSemConexaoConectado} from '../componentesOffline';
 import {URL_ESTILO_MAPA} from '../configuracao';
 import {cores, estilos} from '../estilos';
 import {formatarDistancia, formatarDuracao, limitesDasCoordenadas} from '../mapa';
@@ -12,6 +13,7 @@ import {Coordenada, Rota, Trajeto} from '../tipos';
 import {useLocalizacao, usePosicaoAtual, useStoreDaPosicao} from '../viewmodels/LocalizacaoViewModel';
 import {useMapaViewModel} from '../viewmodels/MapaViewModel';
 import {useNavegacaoViewModel} from '../viewmodels/NavegacaoViewModel';
+import {useOffline} from '../viewmodels/OfflineViewModel';
 import {PainelSimuladorGps} from './PainelSimuladorGps';
 
 const PREENCHIMENTO_DO_TRAJETO = {top: 64, right: 48, bottom: 260, left: 48};
@@ -30,7 +32,9 @@ type Props = {
 };
 
 export function TelaMapa({rota, onVoltar}: Props) {
-  const {estado, recarregar} = useMapaViewModel(rota.id);
+  const offline = useOffline();
+  const baixado = offline.pacote?.rota.id === rota.id ? offline.pacote.trajeto : null;
+  const {estado, recarregar} = useMapaViewModel(rota.id, undefined, {baixado, somenteBaixado: offline.semConexao});
 
   return (
     <View style={estilos.tela}>
@@ -185,6 +189,7 @@ function MapaDoTrajeto({trajeto}: {trajeto: Trajeto}) {
       ) : null}
 
       <View style={estilos.mapaPainel}>
+        <AvisoSemConexaoConectado />
         <IndicadorLocalizacaoConectado />
         {navegando ? (
           <PainelDeNavegacaoConectado navegacao={navegacao} />
@@ -207,6 +212,7 @@ function MapaDoTrajeto({trajeto}: {trajeto: Trajeto}) {
             </Text>
           </>
         )}
+        <PrevisaoDeChegadaConectada trajeto={trajeto} navegacao={navegacao} />
         {navegando ? null : (
           <>
             <BotaoPrincipal titulo="Iniciar navegação" desabilitado={!navegacao.podeIniciar} onPress={navegacao.iniciar} />
