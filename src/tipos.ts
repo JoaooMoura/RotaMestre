@@ -59,6 +59,29 @@ export type Parada = {
   observacao: string;
   status: StatusParada;
   comprovante?: Comprovante;
+  latitude?: number;
+  longitude?: number;
+};
+
+export type Coordenada = [longitude: number, latitude: number];
+
+export type ParadaNoMapa = {
+  id: string;
+  tipo: TipoParada;
+  destinatario: string;
+  endereco: string;
+  status: StatusParada;
+  latitude: number;
+  longitude: number;
+};
+
+export type Trajeto = {
+  rotaId: string;
+  geometria: {type: 'LineString'; coordinates: Coordenada[]};
+  distanciaM: number;
+  duracaoS: number;
+  calculadoEm: number;
+  paradas: ParadaNoMapa[];
 };
 
 export type Rota = {

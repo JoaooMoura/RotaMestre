@@ -28,6 +28,7 @@ import {notificacoesIniciais} from '../dados';
 import {cores, estilos} from '../estilos';
 import {primeiroNome} from '../nomes';
 import {Comprovante, Parada, Rota, StatusParada, TipoParada, Usuario} from '../tipos';
+import {TelaMapa} from './TelaMapa';
 import SignatureScreen, {SignatureViewRef} from 'react-native-signature-canvas';
 import {
   CameraOptions,
@@ -71,9 +72,10 @@ type Fluxo =
   | 'status'
   | 'assinatura'
   | 'foto'
+  | 'mapa'
   | 'concluida';
 
-const FLUXOS_TELA_CHEIA: Fluxo[] = ['adicionar', 'verificar', 'status', 'assinatura', 'foto', 'concluida'];
+const FLUXOS_TELA_CHEIA: Fluxo[] = ['adicionar', 'verificar', 'status', 'assinatura', 'foto', 'mapa', 'concluida'];
 
 type Props = {
   usuario: Usuario;
@@ -195,6 +197,10 @@ export function TelaMotorista({usuario, rota, onAtualizarRota, onSair}: Props) {
   }
 
   function telaDoFluxo() {
+    if (fluxo === 'mapa') {
+      return <TelaMapa rota={rota} onVoltar={() => setFluxo('rota')} />;
+    }
+
     if (fluxo === 'adicionar') {
       return (
         <ScrollView style={estilos.tela} keyboardShouldPersistTaps="handled">
@@ -521,6 +527,7 @@ export function TelaMotorista({usuario, rota, onAtualizarRota, onSair}: Props) {
             {rota.paradas.map((parada, indice) => (
               <CardParada key={parada.id} parada={parada} indice={indice} onPress={() => abrirParada(parada)} />
             ))}
+            <BotaoContornado titulo="Ver no mapa" icone="map-outline" onPress={() => setFluxo('mapa')} />
             {ativa ? (
               <Botao
                 titulo="Pausar rota"

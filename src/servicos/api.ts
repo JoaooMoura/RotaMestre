@@ -1,5 +1,5 @@
 import {API_URL} from '../configuracao';
-import {Motorista, NovoMotorista, Rota, Sessao} from '../tipos';
+import {Motorista, NovoMotorista, Rota, Sessao, Trajeto} from '../tipos';
 
 export const SEM_CONEXAO = 0;
 
@@ -82,6 +82,10 @@ export async function buscarRotaAtual(motoristaId?: string): Promise<Rota | null
     }
     throw falha;
   }
+}
+
+export function obterTrajeto(rotaId: string) {
+  return requisicao<Trajeto>(`/rotas/${encodeURIComponent(rotaId)}/trajeto`);
 }
 
 export function salvarRota(rota: Rota) {
