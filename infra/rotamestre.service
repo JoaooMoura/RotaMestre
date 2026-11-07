@@ -1,0 +1,26 @@
+[Unit]
+Description=API RotaMestre
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=rotamestre
+Group=rotamestre
+WorkingDirectory=/opt/rotamestre/backend
+EnvironmentFile=/opt/rotamestre/backend/.env
+Environment=NODE_ENV=production
+# A VM e2-micro tem 1 GB de RAM: limita o heap do Node para sobrar memória ao Caddy e ao sistema.
+Environment=NODE_OPTIONS=--max-old-space-size=256
+ExecStart=/usr/bin/node --no-warnings=ExperimentalWarning src/server.js
+Restart=always
+RestartSec=5
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/rotamestre/backend/data
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,9 @@
+# Troque SEU-SUBDOMINIO.duckdns.org pelo seu endereço (veja o passo 7 do LEIAME.md).
+# O Caddy obtém e renova sozinho o certificado HTTPS (precisa das portas 80 e 443 abertas).
+SEU-SUBDOMINIO.duckdns.org {
+	request_body {
+		max_size 3MB
+	}
+	encode gzip
+	reverse_proxy 127.0.0.1:3000
+}
