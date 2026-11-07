@@ -41,7 +41,7 @@ function criarServicoAutenticacao({repositorio, segredo, validade = '12h'}) {
       subject: usuario.id,
       expiresIn: validade,
     });
-    return {token, usuario};
+    return {token, usuario, expiraEm: jwt.decode(token).exp * 1000};
   }
 
   function verificar(cabecalhoAuthorization) {

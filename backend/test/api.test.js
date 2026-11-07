@@ -570,6 +570,14 @@ test('login do gestor devolve token e usuário com papel, sem senha', async () =
   assert.equal(jwt.verify(token, SEGREDO_TESTE).sub, 'G-1');
 });
 
+test('login informa quando a sessão expira, em milissegundos, igual ao exp do token', async () => {
+  const {token, expiraEm} = await (await entrar('gestor@rotamestre.com')).json();
+
+  assert.equal(expiraEm, jwt.verify(token, SEGREDO_TESTE).exp * 1000);
+  const dozeHoras = 12 * 60 * 60 * 1000;
+  assert.ok(Math.abs(expiraEm - Date.now() - dozeHoras) < 60 * 1000);
+});
+
 test('senha errada e e-mail inexistente recebem a mesma resposta 401', async () => {
   const senhaErrada = await entrar('gestor@rotamestre.com', 'errada');
   const semConta = await entrar('ninguem@rotamestre.com', '123');
