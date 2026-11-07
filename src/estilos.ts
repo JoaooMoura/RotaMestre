@@ -714,9 +714,9 @@ export const estilos = StyleSheet.create({
   },
   mapaTela: {flex: 1},
   mapaMarcador: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     backgroundColor: cores.primaria,
     borderWidth: 3,
     borderColor: '#FFFFFF',
@@ -747,7 +747,7 @@ export const estilos = StyleSheet.create({
     right: 16,
     padding: 12,
     borderRadius: 12,
-    backgroundColor: '#FEE2E2',
+    backgroundColor: cores.perigoFundo,
   },
   mapaAvisoTexto: {color: cores.erro, fontSize: 14, lineHeight: 20, fontWeight: '500'},
 });

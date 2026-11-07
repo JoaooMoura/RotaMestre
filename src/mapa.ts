@@ -6,14 +6,17 @@ export function limitesDasCoordenadas(coordenadas: Coordenada[]): LimitesDoMapa 
   if (coordenadas.length === 0) {
     return null;
   }
-  const longitudes = coordenadas.map(([longitude]) => longitude);
-  const latitudes = coordenadas.map(([, latitude]) => latitude);
-  return [
-    Math.min(...longitudes),
-    Math.min(...latitudes),
-    Math.max(...longitudes),
-    Math.max(...latitudes),
-  ];
+  let oeste = Infinity;
+  let sul = Infinity;
+  let leste = -Infinity;
+  let norte = -Infinity;
+  for (const [longitude, latitude] of coordenadas) {
+    oeste = Math.min(oeste, longitude);
+    leste = Math.max(leste, longitude);
+    sul = Math.min(sul, latitude);
+    norte = Math.max(norte, latitude);
+  }
+  return [oeste, sul, leste, norte];
 }
 
 export function formatarDistancia(metros: number) {
