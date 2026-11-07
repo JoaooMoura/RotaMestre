@@ -17,9 +17,9 @@ O protótipo atual representa a **Sprint 1 — Fundação e operação básica**
 ### ✅ O que já está prototipado
 
 - Cadastro de motorista, CNH e veículo;
-- Login com e-mail e senha conferidos no servidor (bcrypt + JWT), com o papel **Motorista** ou **Gestor** definido pelo backend — cada papel acessa apenas as operações autorizadas;
-- Confirmação de acesso por código enviado por e-mail (**simulada**: nenhum e-mail é enviado e qualquer código de 6 dígitos é aceito);
-- Recuperação de senha (**simulada**: apenas exibe a confirmação, sem envio de e-mail);
+- Login com separação entre os perfis **Motorista** e **Gestor**;
+- Confirmação de acesso por código enviado por e-mail;
+- Recuperação de senha;
 - Resumo diário do motorista;
 - Central de notificações;
 - Consulta da rota e das paradas;
@@ -31,22 +31,9 @@ O protótipo atual representa a **Sprint 1 — Fundação e operação básica**
 - Anexo de foto do comprovante;
 - Telas de gestão da frota (criação/atribuição de rotas) dentro do próprio app.
 
-### 🔐 Executando localmente
-
-1. Copie `backend/.env.example` para `backend/.env` e preencha `JWT_SECRET` (o próprio arquivo traz o comando para gerar um segredo).
-2. Na pasta `backend/`, rode `npm install` e `npm start`.
-3. Com `ROTAMESTRE_SEED_DEMO=1`, o backend cria as contas de demonstração abaixo (senha `123`). Não habilite essa opção em servidor público.
-
-| Papel | E-mail |
-| :--- | :--- |
-| Gestor | `gestor@rotamestre.com` |
-| Motorista | `motorista@rotamestre.com` |
-
-A sessão fica apenas em memória: ao fechar o aplicativo é preciso entrar novamente (manter a sessão salva no aparelho está previsto junto com o modo offline da Sprint 2).
-
 ### 🚧 Próximas etapas
 
-As funcionalidades de **mapa, navegação, localização contínua, recálculo de rota e operação offline** estão previstas para a Sprint 2. Recursos como **chat, botão de pânico, histórico de viagens, acompanhamento de frota e acessibilidade avançada** fazem parte da Sprint 3. O restante dos requisitos do documento (não essenciais ao MVP) está listado na seção **Backlog Pós-MVP**, ao final deste documento.
+As funcionalidades de **mapa, navegação, localização contínua, recálculo de rota e operação offline** estão previstas para a Sprint 2, junto com o **acompanhamento da frota no mapa**, o **registro e a reprodução do trajeto** e a **interface adequada à condução**. Recursos como **chat, botão de pânico, histórico de viagens e acessibilidade avançada** fazem parte da Sprint 3. O restante dos requisitos do documento (não essenciais ao MVP) está listado na seção **Backlog Pós-MVP**, ao final deste documento.
 
 <br>
 
@@ -64,7 +51,7 @@ Objetivo: Permitir cadastro/acesso, e planejar e executar rotas e entregas.
 | US02.03 - Recuperar a senha por e-mail | Como motorista, quero recuperar minha senha por e-mail, para voltar a acessar o aplicativo quando esquecer a credencial. | RF02, RNF04 |
 | US02.04 - Confirmar acesso por código de e-mail | Como motorista, quero confirmar meu login com um código recebido por e-mail, para proteger o acesso à minha conta. | RF18, RNF04 |
 | US02.05 - Separar acesso de gestor e motorista | Como gestor, quero que cada perfil acesse somente as operações autorizadas, para proteger os dados e a gestão da frota. | RF19, RF25, RF58, RNF04, RNF11 |
-| US03.01 - Acessar as telas de gestão da frota | Como gestor, quero acessar as telas de gestão da frota dentro do aplicativo, para administrar a operação sem depender de um sistema separado. | RF19, RF25, RNF07, RNF08 |
+| US03.01 - Acessar as telas de gestão da frota | Como gestor, quero acessar as telas de gestão da frota dentro do aplicativo, para administrar a operação sem depender de um sistema separado. | RF19, RF25, RF58, RNF07, RNF08 |
 | US03.02 - Atribuir rota e entregá-la ao motorista | Como gestor, quero atribuir uma rota a um motorista, para organizar a execução das entregas. | RF19, RF58 |
 | US03.03 - Reatribuir rota em caso de imprevisto | Como gestor, quero reatribuir uma rota a outro motorista, para continuar a operação diante de um imprevisto. | RF19, RF58 |
 | US03.05 - Receber push de atribuições e alterações | Como motorista, quero receber notificações de novas rotas e alterações, para saber quando minha programação mudar. | RF19, RF40 |
@@ -79,8 +66,8 @@ Objetivo: Permitir cadastro/acesso, e planejar e executar rotas e entregas.
 | US07.03 - Coletar a assinatura do recebedor | Como motorista, quero coletar a assinatura do recebedor, para registrar o comprovante da entrega. | RF10, RNF07, RNF11 |
 | US07.04 - Anexar foto do comprovante com conexão | Como motorista, quero anexar uma foto do comprovante quando estiver conectado, para complementar o registro da entrega. | RF10, RNF04, RNF11 |
 
-### Sprint 2 — Navegação, mapa e operação offline
-Objetivo: Guiar o motorista até o destino e manter o app funcional mesmo com conexão instável.
+### Sprint 2 — Navegação, mapa, operação offline e acompanhamento
+Objetivo: Guiar o motorista até o destino, manter o app funcional mesmo com conexão instável e dar à gestão o acompanhamento da frota, com o registro do trajeto e uma interface adequada à condução.
 
 | User Story | Descrição | Requisitos |
 | :--- | :--- | :--- |
@@ -96,20 +83,20 @@ Objetivo: Guiar o motorista até o destino e manter o app funcional mesmo com co
 | US06.03 - Guardar assinatura coletada offline | Como motorista, quero coletar e guardar a assinatura do recebedor sem internet, para preservar o comprovante até recuperar a conexão. | RF08, RF10, RNF04, RNF05, RNF11 |
 | US06.04 - Sincronizar assinaturas ao reconectar | Como motorista, quero que assinaturas pendentes sejam enviadas quando a conexão voltar, para completar o registro dos comprovantes. | RF08, RF24, RNF05 |
 | US06.05 - Receber atualizações em segundo plano | Como motorista, quero receber atualizações da programação em segundo plano, para consultar as informações disponíveis mais recentes. | RF24, RNF05, RNF09 |
+| US03.04 - Acompanhar a frota no mapa | Como gestor, quero acompanhar a localização e as tarefas dos motoristas no mapa, para conhecer o andamento da operação. | RF19, RF25, RF58, RNF03, RNF09 |
+| US09.02 - Registrar e reproduzir o trajeto | Como motorista, quero registrar o trajeto em segundo plano e reproduzi-lo depois, para analisar por onde passei. | RF28, RNF03, RNF09, RNF11 |
+| US11.01 - Utilizar uma interface adequada à condução | Como motorista, quero controles claros e legíveis, para consultar e operar o aplicativo com menor distração. | RNF07 |
 
-### Sprint 3 — Comunicação, acompanhamento e qualidade
-Objetivo: Fechar o MVP com comunicação em emergência, acompanhamento de frota, histórico consultável e acessibilidade.
+### Sprint 3 — Comunicação, histórico e acessibilidade
+Objetivo: Fechar o MVP com comunicação em emergência, histórico consultável e acessibilidade.
 
 | User Story | Descrição | Requisitos |
 | :--- | :--- | :--- |
-| US03.04 - Acompanhar a frota no mapa | Como gestor, quero acompanhar a localização e as tarefas dos motoristas no mapa, para conhecer o andamento da operação. | RF19, RF25, RF58, RNF03, RNF09 |
 | US08.01 - Trocar mensagens de texto com a central | Como motorista, quero trocar mensagens de texto com a central, para esclarecer situações durante a operação. | RF14, RNF04 |
 | US08.02 - Compartilhar fotos e localização no chat | Como motorista, quero enviar fotos e compartilhar minha localização com a central no chat, para explicar a situação da viagem. | RF14, RNF04, RNF09, RNF11 |
 | US08.03 - Acionar o botão de pânico | Como motorista, quero acionar um alerta de emergência para a central e meus contatos, para comunicar uma situação crítica com minha localização. | RF12, RNF04, RNF11 |
 | US08.04 - Cadastrar contatos de emergência | Como motorista, quero cadastrar os contatos que receberão os e-mails de emergência, para direcionar os alertas às pessoas escolhidas. | RF12 |
 | US09.01 - Consultar histórico de viagens | Como motorista, quero consultar e filtrar minhas viagens realizadas, para conferir a execução do trabalho. | RF15, RNF03, RNF11 |
-| US09.02 - Registrar e reproduzir o trajeto | Como motorista, quero registrar o trajeto em segundo plano e reproduzi-lo depois, para analisar por onde passei. | RF28, RNF03, RNF09, RNF11 |
-| US11.01 - Utilizar uma interface adequada à condução | Como motorista, quero controles claros e legíveis, para consultar e operar o aplicativo com menor distração. | RNF07 |
 | US11.02 - Usar TalkBack e fontes ajustáveis | Como motorista, quero utilizar leitor de tela e fontes ajustadas, para acessar o aplicativo conforme minhas necessidades de visão. | RNF12 |
 
 <br>
