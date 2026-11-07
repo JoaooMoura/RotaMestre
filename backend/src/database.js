@@ -18,6 +18,8 @@ const ROTA_INICIAL = {
       janela: '08:30 - 09:30',
       observacao: 'Entregar na doca lateral',
       status: 'Pendente',
+      latitude: -23.179,
+      longitude: -45.886,
     },
     {
       id: '2',
@@ -27,6 +29,8 @@ const ROTA_INICIAL = {
       janela: '10:00 - 11:00',
       observacao: 'Solicitar nota fiscal',
       status: 'Pendente',
+      latitude: -23.0265,
+      longitude: -45.5558,
     },
     {
       id: '3',
@@ -36,6 +40,8 @@ const ROTA_INICIAL = {
       janela: '11:30 - 12:30',
       observacao: 'Carga frágil',
       status: 'Pendente',
+      latitude: -23.1005,
+      longitude: -45.7068,
     },
   ],
 };
@@ -138,15 +144,27 @@ function criarRepositorio(caminhoBanco, {seedDemo = false} = {}) {
       PRIMARY KEY (rota_id, parada_id),
       FOREIGN KEY (rota_id) REFERENCES rotas(id) ON DELETE CASCADE
     );
+
+    CREATE TABLE IF NOT EXISTS trajetos (
+      rota_id TEXT PRIMARY KEY,
+      hash TEXT NOT NULL,
+      geometria TEXT NOT NULL,
+      distancia_m INTEGER NOT NULL,
+      duracao_s INTEGER NOT NULL,
+      calculado_em INTEGER NOT NULL,
+      FOREIGN KEY (rota_id) REFERENCES rotas(id) ON DELETE CASCADE
+    );
   `);
 
-  function adicionarColunaSeFaltar(tabela, coluna) {
+  function adicionarColunaSeFaltar(tabela, coluna, tipo = 'TEXT') {
     if (!tabelaTemColuna(tabela, coluna)) {
-      banco.exec(`ALTER TABLE ${tabela} ADD COLUMN ${coluna} TEXT`);
+      banco.exec(`ALTER TABLE ${tabela} ADD COLUMN ${coluna} ${tipo}`);
     }
   }
 
   adicionarColunaSeFaltar('comprovantes', 'foto');
+  adicionarColunaSeFaltar('paradas', 'latitude', 'REAL');
+  adicionarColunaSeFaltar('paradas', 'longitude', 'REAL');
   ['telefone', 'cnh_numero', 'cnh_categoria', 'cnh_validade'].forEach(coluna =>
     adicionarColunaSeFaltar('motoristas', coluna),
   );
@@ -195,18 +213,18 @@ function criarRepositorio(caminhoBanco, {seedDemo = false} = {}) {
     return banco
       .prepare(`
         SELECT p.id, p.tipo, p.destinatario, p.endereco, p.janela, p.observacao, p.status,
-               c.recebedor, c.registrado_em
+               p.latitude, p.longitude, c.recebedor, c.registrado_em
         FROM paradas p
         LEFT JOIN comprovantes c ON c.rota_id = p.rota_id AND c.parada_id = p.id
         WHERE p.rota_id = ?
         ORDER BY p.ordem
       `)
       .all(rotaId)
-      .map(({recebedor, registrado_em, ...parada}) =>
-        recebedor
-          ? {...parada, comprovante: {recebedor, registradoEm: registrado_em}}
-          : parada,
-      );
+      .map(({recebedor, registrado_em, latitude, longitude, ...parada}) => ({
+        ...parada,
+        ...(latitude !== null && longitude !== null ? {latitude, longitude} : {}),
+        ...(recebedor ? {comprovante: {recebedor, registradoEm: registrado_em}} : {}),
+      }));
   }
 
   function inserirUsuario(usuario) {
@@ -364,8 +382,9 @@ function criarRepositorio(caminhoBanco, {seedDemo = false} = {}) {
       banco.prepare('DELETE FROM paradas WHERE rota_id = ?').run(rota.id);
       const inserirParada = banco.prepare(`
         INSERT INTO paradas (
-          id, rota_id, ordem, tipo, destinatario, endereco, janela, observacao, status
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+          id, rota_id, ordem, tipo, destinatario, endereco, janela, observacao, status,
+          latitude, longitude
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
       const salvarComprovante = banco.prepare(`
         INSERT INTO comprovantes (rota_id, parada_id, recebedor, assinatura, foto, registrado_em)
@@ -388,6 +407,8 @@ function criarRepositorio(caminhoBanco, {seedDemo = false} = {}) {
           parada.janela,
           parada.observacao,
           parada.status,
+          parada.latitude ?? null,
+          parada.longitude ?? null,
         );
 
         if (parada.comprovante?.assinatura) {
@@ -450,6 +471,56 @@ function criarRepositorio(caminhoBanco, {seedDemo = false} = {}) {
     if (!buscarRotaAtual()) {
       salvarRota(ROTA_INICIAL);
     }
+
+    const completarCoordenadas = banco.prepare(`
+      UPDATE paradas SET latitude = ?, longitude = ?
+      WHERE rota_id = ? AND id = ? AND latitude IS NULL AND longitude IS NULL
+    `);
+    ROTA_INICIAL.paradas.forEach(parada =>
+      completarCoordenadas.run(parada.latitude, parada.longitude, ROTA_INICIAL.id, parada.id),
+    );
+  }
+
+  function buscarTrajeto(rotaId) {
+    const trajeto = banco
+      .prepare(`
+        SELECT hash, geometria, distancia_m, duracao_s, calculado_em
+        FROM trajetos
+        WHERE rota_id = ?
+      `)
+      .get(rotaId);
+
+    return trajeto
+      ? {
+          hash: trajeto.hash,
+          geometria: JSON.parse(trajeto.geometria),
+          distanciaM: trajeto.distancia_m,
+          duracaoS: trajeto.duracao_s,
+          calculadoEm: trajeto.calculado_em,
+        }
+      : null;
+  }
+
+  function salvarTrajeto(rotaId, trajeto) {
+    banco
+      .prepare(`
+        INSERT INTO trajetos (rota_id, hash, geometria, distancia_m, duracao_s, calculado_em)
+        VALUES (?, ?, ?, ?, ?, ?)
+        ON CONFLICT(rota_id) DO UPDATE SET
+          hash = excluded.hash,
+          geometria = excluded.geometria,
+          distancia_m = excluded.distancia_m,
+          duracao_s = excluded.duracao_s,
+          calculado_em = excluded.calculado_em
+      `)
+      .run(
+        rotaId,
+        trajeto.hash,
+        JSON.stringify(trajeto.geometria),
+        trajeto.distanciaM,
+        trajeto.duracaoS,
+        trajeto.calculadoEm,
+      );
   }
 
   if (seedDemo) {
@@ -465,10 +536,12 @@ function criarRepositorio(caminhoBanco, {seedDemo = false} = {}) {
     criarGestor,
     buscarRota: buscarRotaAtualPorId,
     buscarRotaAtual,
+    buscarTrajeto,
     buscarUsuario,
     listarMotoristas,
     salvarMotorista,
     salvarRota,
+    salvarTrajeto,
     fechar: () => banco.close(),
   };
 }

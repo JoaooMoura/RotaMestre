@@ -9,6 +9,7 @@ const {
   validarValidadeToken,
 } = require('./autenticacao');
 const {criarRepositorio} = require('./database');
+const {criarServicoRoteamento, hashDosPontos} = require('./roteamento');
 
 const TIPOS_PARADA = new Set(['Coleta', 'Entrega']);
 const STATUS_PARADA = new Set([
@@ -100,6 +101,22 @@ function comprovanteValido(comprovante, status) {
   );
 }
 
+function coordenadasValidas({latitude, longitude}) {
+  if (latitude === undefined && longitude === undefined) {
+    return true;
+  }
+  return (
+    Number.isFinite(latitude) &&
+    Number.isFinite(longitude) &&
+    Math.abs(latitude) <= 90 &&
+    Math.abs(longitude) <= 180
+  );
+}
+
+function temLocalizacao(parada) {
+  return parada.latitude !== undefined && parada.longitude !== undefined;
+}
+
 function validarRota(rota) {
   if (
     !rota ||
@@ -129,6 +146,10 @@ function validarRota(rota) {
       !STATUS_PARADA.has(parada.status)
     ) {
       return 'Existe uma parada inválida ou duplicada na rota.';
+    }
+
+    if (!coordenadasValidas(parada)) {
+      return 'Coordenadas da parada inválidas.';
     }
 
     if (
@@ -199,7 +220,14 @@ function lerJson(requisicao) {
   });
 }
 
-function criarServidor({caminhoBanco, segredoJwt, validadeToken = '12h', seedDemo = false}) {
+function criarServidor({
+  caminhoBanco,
+  segredoJwt,
+  validadeToken = '12h',
+  seedDemo = false,
+  urlOsrm = 'http://127.0.0.1:5000',
+  servicoRoteamento = criarServicoRoteamento({urlOsrm}),
+}) {
   validarSegredoJwt(segredoJwt);
   validarValidadeToken(validadeToken);
   const repositorio = criarRepositorio(caminhoBanco, {seedDemo});
@@ -291,6 +319,65 @@ function criarServidor({caminhoBanco, segredoJwt, validadeToken = '12h', seedDem
         return;
       }
 
+      const trajetoEncontrado = url.pathname.match(/^\/api\/rotas\/([^/]+)\/trajeto$/);
+
+      if (requisicao.method === 'GET' && trajetoEncontrado) {
+        const usuario = exigirUsuario(requisicao);
+        const rota = repositorio.buscarRota(decodeURIComponent(trajetoEncontrado[1]));
+
+        if (!rota) {
+          throw erroHttp(404, 'Rota não encontrada.');
+        }
+        if (usuario.papel === 'motorista' && rota.motoristaId !== usuario.id) {
+          throw erroHttp(403, 'Motorista só pode consultar a própria rota.');
+        }
+
+        const semLocalizacao = rota.paradas.filter(parada => !temLocalizacao(parada));
+        if (semLocalizacao.length > 0) {
+          const nomes = semLocalizacao.map(parada => `"${parada.destinatario}"`).join(', ');
+          responder(resposta, 422, {
+            mensagem: `Paradas sem localização no mapa: ${nomes}.`,
+            paradasSemLocalizacao: semLocalizacao.map(parada => parada.id),
+          });
+          return;
+        }
+
+        const pontos = rota.paradas.map(parada => ({
+          latitude: parada.latitude,
+          longitude: parada.longitude,
+          rotulo: parada.destinatario,
+        }));
+        const hash = hashDosPontos(pontos);
+
+        let trajeto = repositorio.buscarTrajeto(rota.id);
+        if (trajeto?.hash !== hash) {
+          trajeto = {
+            ...(await servicoRoteamento.calcularTrajeto(pontos)),
+            hash,
+            calculadoEm: Date.now(),
+          };
+          repositorio.salvarTrajeto(rota.id, trajeto);
+        }
+
+        responder(resposta, 200, {
+          rotaId: rota.id,
+          geometria: trajeto.geometria,
+          distanciaM: trajeto.distanciaM,
+          duracaoS: trajeto.duracaoS,
+          calculadoEm: trajeto.calculadoEm,
+          paradas: rota.paradas.map(({id, tipo, destinatario, endereco, status, latitude, longitude}) => ({
+            id,
+            tipo,
+            destinatario,
+            endereco,
+            status,
+            latitude,
+            longitude,
+          })),
+        });
+        return;
+      }
+
       const rotaEncontrada = url.pathname.match(/^\/api\/rotas\/([^/]+)$/);
 
       if (requisicao.method === 'PUT' && rotaEncontrada) {
@@ -355,6 +442,7 @@ if (require.main === module) {
       segredoJwt: process.env.JWT_SECRET,
       validadeToken: process.env.JWT_VALIDADE || '12h',
       seedDemo: process.env.ROTAMESTRE_SEED_DEMO === '1',
+      urlOsrm: process.env.OSRM_URL || 'http://127.0.0.1:5000',
     });
   } catch (falha) {
     process.stderr.write(`Não foi possível iniciar a API: ${falha.message}\n`);
