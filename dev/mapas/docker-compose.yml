@@ -1,0 +1,20 @@
+# Serviços locais de mapa para a Sprint 2 (US05.01). Só para desenvolvimento no PC.
+# Antes, rode: node dev/mapas/preparar-mapas.js
+services:
+  osrm:
+    image: ghcr.io/project-osrm/osrm-backend
+    command: osrm-routed --algorithm mld /data/regiao.osrm
+    ports:
+      - "127.0.0.1:5000:5000"
+    volumes:
+      - ./dados/osrm:/data:ro
+    restart: unless-stopped
+
+  tileserver:
+    image: maptiler/tileserver-gl
+    command: --config /data/config.json
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - ./dados/tileserver:/data:ro
+    restart: unless-stopped

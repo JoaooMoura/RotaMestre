@@ -91,3 +91,5 @@ backend/test/
 *.test.tsx
 *.test.js
 *.snap
+# Dados de mapa gerados localmente (centenas de MB)
+dev/mapas/dados/
