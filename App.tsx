@@ -10,6 +10,10 @@ import {TelaGestorSprint} from './src/telas/TelaGestorSprint';
 import {TelaMotorista} from './src/telas/TelaMotorista';
 import {Rota} from './src/tipos';
 import {useOperacaoViewModel} from './src/viewmodels/OperacaoViewModel';
+import {LocalizacaoProvider} from './src/viewmodels/LocalizacaoViewModel';
+import {servicoVozNativo} from './src/servicos/servicoVoz';
+import {dependenciasLocalizacaoPadrao} from './src/viewmodels/dependenciasLocalizacao';
+import {NavegacaoProvider} from './src/viewmodels/NavegacaoViewModel';
 import {SessaoProvider, useSessao} from './src/viewmodels/SessaoViewModel';
 
 function Carregando({mensagem}: {mensagem: string}) {
@@ -25,6 +29,9 @@ function ConteudoApp() {
   const {usuario, restaurando, sair} = useSessao();
   const {estado, recarregar, atualizarRota} = useOperacaoViewModel(usuario);
 
+  const rotaEmAndamento =
+    usuario?.papel === 'motorista' && estado.tipo === 'pronto' && estado.rota.status === 'Em andamento';
+
   async function salvar(rota: Rota) {
     const resultado = await atualizarRota(rota);
     if (!resultado.ok && resultado.mensagem) {
@@ -33,6 +40,7 @@ function ConteudoApp() {
     return resultado.ok;
   }
 
+  const conteudo = () => {
   if (restaurando) {
     return <Carregando mensagem="Abrindo sua sessão..." />;
   }
@@ -110,6 +118,13 @@ function ConteudoApp() {
         />
       );
   }
+  };
+
+  return (
+    <LocalizacaoProvider ativo={rotaEmAndamento} dependencias={dependenciasLocalizacaoPadrao}>
+      <NavegacaoProvider voz={servicoVozNativo}>{conteudo()}</NavegacaoProvider>
+    </LocalizacaoProvider>
+  );
 }
 
 function App() {

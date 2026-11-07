@@ -75,12 +75,28 @@ export type ParadaNoMapa = {
   longitude: number;
 };
 
+export type Manobra = {
+  /** Tipo do OSRM: depart, turn, end of road, on ramp, off ramp, merge, fork, new name, continue, roundabout, arrive... */
+  tipo: string;
+  modificador: string | null;
+  saida: number | null;
+  /** Via para a qual a manobra leva (nome ou referência da rodovia); vazia se não tem nome. */
+  via: string;
+  /** Posição da manobra na geometria do trajeto. */
+  indice: number;
+  distanciaM: number;
+  duracaoS: number;
+  /** Trecho entre paradas: 0 vai da parada 1 à 2, e assim por diante. */
+  perna: number;
+};
+
 export type Trajeto = {
   rotaId: string;
   geometria: {type: 'LineString'; coordinates: Coordenada[]};
   distanciaM: number;
   duracaoS: number;
   calculadoEm: number;
+  manobras: Manobra[];
   paradas: ParadaNoMapa[];
 };
 

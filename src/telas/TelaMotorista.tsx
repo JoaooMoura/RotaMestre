@@ -28,6 +28,7 @@ import {notificacoesIniciais} from '../dados';
 import {cores, estilos} from '../estilos';
 import {primeiroNome} from '../nomes';
 import {Comprovante, Parada, Rota, StatusParada, TipoParada, Usuario} from '../tipos';
+import {IndicadorLocalizacaoConectado} from '../componentesLocalizacao';
 import {TelaMapa} from './TelaMapa';
 import SignatureScreen, {SignatureViewRef} from 'react-native-signature-canvas';
 import {
@@ -524,6 +525,7 @@ export function TelaMotorista({usuario, rota, onAtualizarRota, onSair}: Props) {
                 <View style={[estilos.progresso, {width: `${progresso}%`}]} />
               </View>
             </View>
+            <IndicadorLocalizacaoConectado />
             {rota.paradas.map((parada, indice) => (
               <CardParada key={parada.id} parada={parada} indice={indice} onPress={() => abrirParada(parada)} />
             ))}

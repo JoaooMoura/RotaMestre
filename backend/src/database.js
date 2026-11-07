@@ -165,6 +165,7 @@ function criarRepositorio(caminhoBanco, {seedDemo = false} = {}) {
   adicionarColunaSeFaltar('comprovantes', 'foto');
   adicionarColunaSeFaltar('paradas', 'latitude', 'REAL');
   adicionarColunaSeFaltar('paradas', 'longitude', 'REAL');
+  adicionarColunaSeFaltar('trajetos', 'manobras');
   ['telefone', 'cnh_numero', 'cnh_categoria', 'cnh_validade'].forEach(coluna =>
     adicionarColunaSeFaltar('motoristas', coluna),
   );
@@ -484,7 +485,7 @@ function criarRepositorio(caminhoBanco, {seedDemo = false} = {}) {
   function buscarTrajeto(rotaId) {
     const trajeto = banco
       .prepare(`
-        SELECT hash, geometria, distancia_m, duracao_s, calculado_em
+        SELECT hash, geometria, distancia_m, duracao_s, calculado_em, manobras
         FROM trajetos
         WHERE rota_id = ?
       `)
@@ -497,6 +498,7 @@ function criarRepositorio(caminhoBanco, {seedDemo = false} = {}) {
           distanciaM: trajeto.distancia_m,
           duracaoS: trajeto.duracao_s,
           calculadoEm: trajeto.calculado_em,
+          manobras: trajeto.manobras ? JSON.parse(trajeto.manobras) : null,
         }
       : null;
   }
@@ -504,14 +506,15 @@ function criarRepositorio(caminhoBanco, {seedDemo = false} = {}) {
   function salvarTrajeto(rotaId, trajeto) {
     banco
       .prepare(`
-        INSERT INTO trajetos (rota_id, hash, geometria, distancia_m, duracao_s, calculado_em)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO trajetos (rota_id, hash, geometria, distancia_m, duracao_s, calculado_em, manobras)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(rota_id) DO UPDATE SET
           hash = excluded.hash,
           geometria = excluded.geometria,
           distancia_m = excluded.distancia_m,
           duracao_s = excluded.duracao_s,
-          calculado_em = excluded.calculado_em
+          calculado_em = excluded.calculado_em,
+          manobras = excluded.manobras
       `)
       .run(
         rotaId,
@@ -520,6 +523,7 @@ function criarRepositorio(caminhoBanco, {seedDemo = false} = {}) {
         trajeto.distanciaM,
         trajeto.duracaoS,
         trajeto.calculadoEm,
+        JSON.stringify(trajeto.manobras ?? []),
       );
   }
 

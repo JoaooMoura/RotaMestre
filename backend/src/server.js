@@ -350,7 +350,8 @@ function criarServidor({
         const hash = hashDosPontos(pontos);
 
         let trajeto = repositorio.buscarTrajeto(rota.id);
-        if (trajeto?.hash !== hash) {
+        // Trajetos guardados antes das manobras existirem (manobras nulas) são recalculados.
+        if (trajeto?.hash !== hash || trajeto.manobras === null) {
           trajeto = {
             ...(await servicoRoteamento.calcularTrajeto(pontos)),
             hash,
@@ -365,6 +366,7 @@ function criarServidor({
           distanciaM: trajeto.distanciaM,
           duracaoS: trajeto.duracaoS,
           calculadoEm: trajeto.calculadoEm,
+          manobras: trajeto.manobras ?? [],
           paradas: rota.paradas.map(({id, tipo, destinatario, endereco, status, latitude, longitude}) => ({
             id,
             tipo,

@@ -1,17 +1,26 @@
-import React, {useMemo, useState} from 'react';
+import React, {useEffect, useMemo, useRef, useState} from 'react';
 import {ActivityIndicator, Text, View} from 'react-native';
-import {Camera, GeoJSONSource, Layer, Map, Marker} from '@maplibre/maplibre-react-native';
+import {Camera, CameraRef, GeoJSONSource, Layer, Map, Marker} from '@maplibre/maplibre-react-native';
 import {MaterialDesignIcons} from '@react-native-vector-icons/material-design-icons';
-import {Botao, Cabecalho} from '../componentes';
+import {Botao, BotaoPrincipal, Cabecalho} from '../componentes';
+import {FaixaDaManobraConectada, PainelDeNavegacaoConectado} from '../componentesNavegacao';
+import {IndicadorLocalizacaoConectado} from '../componentesLocalizacao';
 import {URL_ESTILO_MAPA} from '../configuracao';
 import {cores, estilos} from '../estilos';
 import {formatarDistancia, formatarDuracao, limitesDasCoordenadas} from '../mapa';
 import {Coordenada, Rota, Trajeto} from '../tipos';
+import {useLocalizacao, usePosicaoAtual, useStoreDaPosicao} from '../viewmodels/LocalizacaoViewModel';
 import {useMapaViewModel} from '../viewmodels/MapaViewModel';
+import {useNavegacaoViewModel} from '../viewmodels/NavegacaoViewModel';
+import {PainelSimuladorGps} from './PainelSimuladorGps';
 
-const PREENCHIMENTO_DO_TRAJETO = {top: 64, right: 48, bottom: 160, left: 48};
+const PREENCHIMENTO_DO_TRAJETO = {top: 64, right: 48, bottom: 260, left: 48};
 const POSICAO_ATRIBUICAO = {top: 8, right: 8};
 const POSICAO_LOGO = {top: 8, left: 8};
+// A bússola (aparece quando o mapa gira) fica ao lado da atribuição, nunca por cima dela.
+const POSICAO_BUSSOLA = {top: 8, right: 64};
+const ZOOM_DA_NAVEGACAO = 16.5;
+const INTERVALO_DA_CAMERA_MS = 1500;
 const LAYOUT_LINHA = {'line-cap': 'round', 'line-join': 'round'} as const;
 const PAINT_LINHA = {'line-color': cores.primaria, 'line-width': 5};
 
@@ -74,6 +83,50 @@ function MapaDoTrajeto({trajeto}: {trajeto: Trajeto}) {
     [trajeto.paradas],
   );
   const selecionada = trajeto.paradas.find(parada => parada.id === selecionadaId);
+  const navegacao = useNavegacaoViewModel(trajeto);
+  const posicaoStore = useStoreDaPosicao();
+  const cameraRef = useRef<CameraRef>(null);
+  const navegando = navegacao.estado.tipo !== 'inativa';
+  const seguindo = navegacao.estado.tipo === 'navegando';
+
+  // Durante a navegação a câmera acompanha o veículo (no máximo a cada 1,5 s, para não pesar na tela).
+  useEffect(() => {
+    if (!seguindo) {
+      return undefined;
+    }
+    let ultimaEm = 0;
+    const seguir = () => {
+      const posicao = posicaoStore.obter();
+      const agora = Date.now();
+      if (posicao && agora - ultimaEm >= INTERVALO_DA_CAMERA_MS) {
+        ultimaEm = agora;
+        cameraRef.current?.easeTo({
+          center: [posicao.longitude, posicao.latitude],
+          zoom: ZOOM_DA_NAVEGACAO,
+          bearing: posicao.rumoGraus ?? 0,
+          duration: 1000,
+        });
+      }
+    };
+    seguir();
+    return posicaoStore.assinar(seguir);
+  }, [seguindo, posicaoStore]);
+
+  // Ao encerrar, volta a enquadrar a rota inteira.
+  const estavaNavegando = useRef(false);
+  useEffect(() => {
+    if (estavaNavegando.current && !navegando) {
+      const limites = limitesDasCoordenadas(trajeto.geometria.coordinates);
+      if (limites) {
+        cameraRef.current?.fitBounds(limites, {padding: PREENCHIMENTO_DO_TRAJETO, bearing: 0, duration: 800});
+      }
+    }
+    estavaNavegando.current = navegando;
+  }, [navegando, trajeto.geometria]);
+  const rotaSimulada = useMemo(
+    () => trajeto.geometria.coordinates.map(([longitude, latitude]) => ({latitude, longitude})),
+    [trajeto.geometria],
+  );
 
   return (
     <View style={estilos.mapaTela}>
@@ -82,9 +135,10 @@ function MapaDoTrajeto({trajeto}: {trajeto: Trajeto}) {
         mapStyle={URL_ESTILO_MAPA}
         attributionPosition={POSICAO_ATRIBUICAO}
         logoPosition={POSICAO_LOGO}
+        compassPosition={POSICAO_BUSSOLA}
         onDidFailLoadingMap={() => setMapaFalhou(true)}
         onDidFinishLoadingMap={() => setMapaFalhou(false)}>
-        <Camera initialViewState={visaoInicial} />
+        <Camera ref={cameraRef} initialViewState={visaoInicial} />
         <GeoJSONSource id="trajeto" data={dadosDoTrajeto}>
           <Layer id="trajeto-linha" type="line" layout={LAYOUT_LINHA} paint={PAINT_LINHA} />
         </GeoJSONSource>
@@ -112,18 +166,29 @@ function MapaDoTrajeto({trajeto}: {trajeto: Trajeto}) {
             </View>
           </Marker>
         ))}
+        <MarcadorDoVeiculo />
       </Map>
 
-      {mapaFalhou ? (
-        <View style={estilos.mapaAviso} accessibilityLiveRegion="polite">
-          <Text style={estilos.mapaAvisoTexto}>
-            Não foi possível carregar o mapa de fundo. O trajeto e as paradas continuam disponíveis.
-          </Text>
+      {mapaFalhou || navegando ? (
+        <View style={estilos.mapaFaixaDeNavegacao}>
+          {mapaFalhou ? (
+            <View style={estilos.mapaAvisoEmLinha} accessibilityLiveRegion="polite">
+              <Text style={estilos.mapaAvisoTexto}>
+                Não foi possível carregar o mapa de fundo. O trajeto e as paradas continuam disponíveis.
+              </Text>
+            </View>
+          ) : null}
+          {navegando ? (
+            <FaixaDaManobraConectada navegacao={navegacao} />
+          ) : null}
         </View>
       ) : null}
 
       <View style={estilos.mapaPainel}>
-        {selecionada ? (
+        <IndicadorLocalizacaoConectado />
+        {navegando ? (
+          <PainelDeNavegacaoConectado navegacao={navegacao} />
+        ) : selecionada ? (
           <>
             <Text style={estilos.mapaPainelTitulo}>{selecionada.destinatario}</Text>
             <Text style={estilos.textoApoio}>{selecionada.endereco}</Text>
@@ -142,7 +207,33 @@ function MapaDoTrajeto({trajeto}: {trajeto: Trajeto}) {
             </Text>
           </>
         )}
+        {navegando ? null : (
+          <>
+            <BotaoPrincipal titulo="Iniciar navegação" desabilitado={!navegacao.podeIniciar} onPress={navegacao.iniciar} />
+            {navegacao.motivoDeNaoPoderIniciar ? <Text style={estilos.textoApoio}>{navegacao.motivoDeNaoPoderIniciar}</Text> : null}
+          </>
+        )}
+        <PainelSimuladorGps rota={rotaSimulada} />
       </View>
     </View>
+  );
+}
+
+/** Posição do veículo; só este componente renderiza a cada leitura de GPS. */
+function MarcadorDoVeiculo() {
+  const posicao = usePosicaoAtual();
+  const {estado} = useLocalizacao();
+  if (!posicao || estado.tipo === 'permissaoNegada' || estado.tipo === 'permissaoAproximada') {
+    return null;
+  }
+  const atual = estado.tipo === 'ativa' && !estado.desatualizada;
+  return (
+    <Marker id="veiculo" lngLat={[posicao.longitude, posicao.latitude]}>
+      <View
+        accessible
+        accessibilityLabel={atual ? 'Sua posição' : 'Última posição conhecida, desatualizada'}
+        style={[estilos.mapaVeiculo, !atual && estilos.mapaVeiculoAntigo]}
+      />
+    </Marker>
   );
 }
