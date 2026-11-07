@@ -84,3 +84,10 @@ docs/
 backend/.env
 # Backups automáticos criados pelas migrações do banco
 /backend/data/*.bak
+__tests__/
+__mocks__/
+backend/test/
+*.test.ts
+*.test.tsx
+*.test.js
+*.snap
