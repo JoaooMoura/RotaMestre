@@ -336,6 +336,7 @@ function criarServidor({caminhoBanco, segredoJwt, validadeToken = '12h', seedDem
 
 if (require.main === module) {
   const porta = Number(process.env.PORT || 3000);
+  const host = process.env.HOST || '0.0.0.0';
   const caminhoBanco =
     process.env.ROTAMESTRE_DB_PATH ||
     path.join(__dirname, '..', 'data', 'rotamestre.sqlite');
@@ -360,8 +361,8 @@ if (require.main === module) {
     process.exit(1);
   }
 
-  aplicacao.servidor.listen(porta, '0.0.0.0', () => {
-    process.stdout.write(`API RotaMestre disponível na porta ${porta}\n`);
+  aplicacao.servidor.listen(porta, host, () => {
+    process.stdout.write(`API RotaMestre disponível em ${host}:${porta}\n`);
   });
 
   function encerrar() {

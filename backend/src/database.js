@@ -456,8 +456,13 @@ function criarRepositorio(caminhoBanco, {seedDemo = false} = {}) {
     garantirDadosDemo();
   }
 
+  function criarGestor(gestor) {
+    inserirUsuario({...gestor, papel: 'gestor'});
+  }
+
   return {
     buscarCredenciais,
+    criarGestor,
     buscarRota: buscarRotaAtualPorId,
     buscarRotaAtual,
     buscarUsuario,

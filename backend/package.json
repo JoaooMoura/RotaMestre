@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "start": "node --env-file-if-exists=.env --no-warnings=ExperimentalWarning src/server.js",
+    "criar-gestor": "node --no-warnings=ExperimentalWarning --env-file-if-exists=.env scripts/criar-gestor.js",
     "test": "node --no-warnings=ExperimentalWarning --test"
   },
   "engines": {
