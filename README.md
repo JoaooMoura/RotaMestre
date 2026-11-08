@@ -12,6 +12,8 @@
 
 ## 📱 Escopo do Protótipo
 
+> **Situação (fim da Sprint 2):** a Sprint 1 e a Sprint 2 estão entregues no aplicativo (veja "Sprint 2 — entregue" abaixo e o backlog). A descrição desta seção continua valendo para a Sprint 1.
+
 O protótipo atual representa a **Sprint 1 — Fundação e operação básica** do RotaMestre, em formato **mobile**, com foco nos principais fluxos de uso do motorista e do gestor. **É um único aplicativo com dois tipos de conta (motorista e gestor), sem painel web separado.**
 
 ### ✅ O que já está prototipado
@@ -32,11 +34,59 @@ O protótipo atual representa a **Sprint 1 — Fundação e operação básica**
 - Anexo de foto do comprovante;
 - Telas de gestão da frota (criação/atribuição de rotas) dentro do próprio app.
 
+### ✅ Sprint 2 — entregue
+
+Todas as histórias da Sprint 2 estão implementadas e cobertas por testes automatizados; foi conferida em um Galaxy A25, com o backend e os serviços de mapa rodando no PC (veja "Executando localmente"). Foram **validados no Galaxy A25**, além do que já constava: o **GPS real andando**, a tela **Minhas viagens** (com a reprodução do trajeto) e a **tarefa de 15 minutos em segundo plano com o app fechado**. O que ainda **não** foi validado está em "O que ainda não foi validado no aparelho", abaixo. Foram entregues:
+
+- **Mapa e navegação:** trajeto no mapa com paradas (US05.01), instruções visuais e por voz (US05.02), localização contínua com serviço em primeiro plano (US05.03), recálculo após desvio com conexão (US05.04), alertas de aproximação, desvio e excesso de velocidade (US05.05), restrição de digitação em movimento (US05.06) e previsão de chegada (US05.07).
+- **Operação offline:** baixar rota e mapa (US06.01), abrir a rota sem rede (US06.02), guardar assinatura offline (US06.03), sincronizar ao reconectar (US06.04) e atualizar a programação em segundo plano (US06.05).
+- **Gestão e acompanhamento:** frota no mapa para o gestor (US03.04) e registro e reprodução do trajeto percorrido (US09.02).
+- **Condução:** interface adequada à condução (US11.01).
+
+#### O que é real e o que é simulado
+
+| Real (funciona de verdade) | Simulado ou provisório |
+| :--- | :--- |
+| Login com bcrypt + JWT e papéis gestor/motorista conferidos no servidor; sessão no armazenamento criptografado | **Código de confirmação do e-mail** (qualquer código de 6 dígitos vale) e **recuperação de senha** (só exibe a confirmação) |
+| Rotas, trajetos e manobras calculados pelo **OSRM** com dados do OpenStreetMap (recorte provisório ao redor de São José dos Campos) | **Servidor no PC**: o app fala com o backend e o mapa por `adb reverse`; ainda não há VM, nem HTTPS, nem `URL_PRODUCAO` (um APK de release não abre) |
+| Mapa vetorial servido pelo TileServer GL local e pacote de mapa baixado no aparelho | **Simulador de GPS** (botões "Andar/Parar/Desviar/Sem sinal" no mapa): só em desenvolvimento, para testar com o aparelho parado; será removido do release |
+| **GPS real** do aparelho, voz do Android (TTS) e vibração dos alertas | **Previsão de chegada**: estimativa pela distância das vias, sem trânsito em tempo real |
+| Limites de velocidade vindos de `maxspeed` explícito do OpenStreetMap (onde não há, o app diz "indisponível") | **Paradas novas** criadas no app nascem sem coordenada (falta a geocodificação, HU04.01); só a rota demo RT-001 e rotas enviadas pela API têm coordenadas |
+| Posição do motorista enviada ao servidor (só a última, vista só pelo gestor, apagada ao parar) | **Otimização de paradas** (US04.02) segue como na Sprint 1 (ordenação de demonstração) |
+| Trajeto gravado e reproduzido no aparelho (cifrado, nada vai ao servidor) | **Notificações push** (US03.05): ainda não existem |
+| Tarefa em segundo plano (WorkManager) que atualiza a rota baixada | |
+
+#### O que ainda não foi validado no aparelho
+
+- **Bateria e consumo de dados** com o aparelho solto (ensaio de 10 minutos; meta de referência: ≤ 3% de bateria e ≤ 1 MB de dados), incluindo o consumo do compartilhamento de posição e da tarefa em segundo plano. Na Sprint 2 o celular ficou no cabo; o ensaio fica para a Sprint 3.
+- A **compilação de release** (continua dependendo de `URL_PRODUCAO` e `URL_ESTILO_PRODUCAO`, que só serão preenchidas com a VM, na Sprint 3).
+
 ### 🔐 Executando localmente
+
+Requisitos: Node 22.13 ou mais, Android SDK com um aparelho Android ligado por USB (depuração USB ativa) e, para o mapa, Docker Desktop.
+
+**Backend**
 
 1. Copie `backend/.env.example` para `backend/.env` e preencha `JWT_SECRET` (o próprio arquivo traz o comando para gerar um segredo).
 2. Na pasta `backend/`, rode `npm install` e `npm start`.
-3. Com `ROTAMESTRE_SEED_DEMO=1`, o backend cria as contas de demonstração abaixo (senha `123`). Não habilite essa opção em servidor público.
+3. Com `ROTAMESTRE_SEED_DEMO=1`, o backend cria as contas de demonstração abaixo (senha `123`) e a rota `RT-001`. Não habilite essa opção em servidor público.
+
+**Mapa, rotas e limites de velocidade (Sprint 2, só no PC)** — detalhes em `dev/mapas/LEIAME.md`
+
+4. Uma vez (baixa ~860 MB do Geofabrik e usa Docker): `node dev/mapas/preparar-mapas.js` recorta a região, prepara o OSRM e gera os tiles.
+5. Uma vez (usa Docker; depende do passo 4): `node dev/mapas/extrair-limites.js` gera `dev/mapas/dados/limites/limites.json` com os limites de velocidade explícitos do OpenStreetMap. Sem esse arquivo o app mostra o limite como "indisponível".
+6. Suba os serviços: `docker compose -f dev/mapas/docker-compose.yml up -d` (OSRM em `127.0.0.1:5000`, só no PC, e TileServer GL em `:8080`). Reinicie o backend depois de gerar os limites.
+
+**Aplicativo**
+
+7. Na raiz do projeto, rode `npm install` e `npm start` (Metro, porta 8081).
+8. Com o aparelho no cabo, abra os túneis: `adb reverse tcp:3000 tcp:3000`, `adb reverse tcp:8081 tcp:8081` e `adb reverse tcp:8080 tcp:8080`. Eles se perdem quando o cabo é reconectado; sem o 8081 o app abre com "Unable to load script".
+9. Instale e abra o app: `npx react-native run-android --no-packager` (use `--no-packager` se o Metro já estiver rodando). No PowerShell do Claude Code desta máquina, limpe antes `Remove-Item Env:NoDefaultCurrentDirectoryInExePath` para o `gradlew.bat` ser encontrado. A biblioteca de segundo plano é nativa: depois de instalar dependências novas o app precisa ser reinstalado por esse comando.
+10. Entre com uma das contas abaixo. A tela pede um código de 6 dígitos: **digite quaisquer seis números** (a confirmação por e-mail é simulada).
+   - **Motorista:** **Minha rota → Ver no mapa → Iniciar navegação**. Em desenvolvimento, o botão "GPS simulado" no painel do mapa anda, para e desvia sem sair do lugar. **Perfil → Minhas viagens** mostra os trajetos gravados.
+   - **Gestor:** **Motoristas → Ver frota no mapa** mostra os motoristas com rota em andamento (o motorista precisa estar com a rota em andamento em outro aparelho, ou usar a rota demo).
+
+Testes: `npx jest __tests__` no app (o `__tests__/App.test.tsx` já era quebrado por causa do `react-native-signature-canvas`; rode as suítes por caminho) e `npm test` em `backend/`. Para criar o primeiro gestor sem o modo demo: `npm run criar-gestor -- "Nome" email` em `backend/`.
 
 | Papel | E-mail |
 | :--- | :--- |
@@ -47,7 +97,14 @@ Ao entrar, marque **Manter conectado neste aparelho** para continuar logado depo
 
 ### 🚧 Próximas etapas
 
-As funcionalidades de **mapa, navegação, localização contínua, recálculo de rota e operação offline** estão previstas para a Sprint 2, junto com o **acompanhamento da frota no mapa**, o **registro e a reprodução do trajeto** e a **interface adequada à condução**. Recursos como **chat, botão de pânico, histórico de viagens e acessibilidade avançada** fazem parte da Sprint 3. O restante dos requisitos do documento (não essenciais ao MVP) está listado na seção **Backlog Pós-MVP**, ao final deste documento.
+As funcionalidades de **mapa, navegação, localização contínua, recálculo de rota e operação offline**, o **acompanhamento da frota no mapa**, o **registro e a reprodução do trajeto** e a **interface adequada à condução** foram entregues na Sprint 2 (veja "Sprint 2 — entregue"). Recursos como **chat, botão de pânico, histórico de viagens e acessibilidade avançada** fazem parte da Sprint 3.
+
+Além das histórias da Sprint 3, **ficam para a Sprint 3 os itens que a Sprint 2 deixou pendentes** (lista completa em `docs/pendencias-sprint2.md`):
+
+- **Infraestrutura e release:** publicar o backend em VM com HTTPS e preencher `URL_PRODUCAO` e `URL_ESTILO_PRODUCAO` (hoje um APK de release não abre); decidir onde roda o OSRM e de onde o aparelho baixa o pacote de mapa (a VM e2-micro não comporta os serviços de mapa); remover o simulador de GPS do release; geocodificação de endereços (HU04.01).
+- **Segurança e privacidade:** limite de tentativas (rate limit) no login, no recálculo e no envio de posição antes de expor a VM; restringir o CORS; manter o OSRM próprio para a posição do motorista não sair da nossa infraestrutura; consentimento explícito e opção de desligar o compartilhamento de posição; apagar todas as viagens e desligar a gravação; conceito de equipe para o gestor ver só os motoristas dele.
+- **Validação em campo:** ensaio de bateria e dados com o aparelho solto (10 minutos) e build de release.
+- **Offline e assinatura:** envio das assinaturas em segundo plano (WorkManager), PIN ou biometria para coletar assinatura offline e tratamento da hora da coleta. O restante dos requisitos do documento (não essenciais ao MVP) está listado na seção **Backlog Pós-MVP**, ao final deste documento.
 
 <br>
 
@@ -85,21 +142,23 @@ Objetivo: Guiar o motorista até o destino, manter o app funcional mesmo com con
 
 | User Story | Descrição | Requisitos |
 | :--- | :--- | :--- |
-| US05.01 - Visualizar o trajeto no mapa | Como motorista, quero visualizar minha rota em um mapa interativo, para compreender o trajeto e as paradas. | RF05, RNF03, RNF07 |
-| US05.02 - Navegar com instruções visuais e de voz | Como motorista, quero receber instruções visuais e faladas para cada manobra, para seguir a rota durante a condução. | RF05, RNF03, RNF07, RNF09 |
-| US05.03 - Manter a localização durante a viagem | Como motorista, quero que minha localização continue sendo acompanhada durante a viagem, para manter o andamento da rota atualizado. | RF06, RNF03, RNF09 |
-| US05.04 - Recalcular após desvio com conexão | Como motorista, quero receber um novo trajeto quando sair da rota, para continuar até as paradas restantes. | RF06 |
-| US05.05 - Receber alertas de navegação | Como motorista, quero receber alertas de aproximação, desvio e excesso de velocidade, para perceber situações relevantes durante o percurso. | RF17, RNF07 |
-| US05.06 - Restringir interações durante movimento | Como motorista, quero que interações que exijam digitação sejam restringidas em movimento, para reduzir distrações. | RF53, RNF07 |
-| US05.07 - Consultar previsão de chegada | Como motorista, quero acompanhar a previsão de chegada a cada destino, para conhecer o andamento da jornada. | RF54 |
-| US06.01 - Baixar rota e mapa regional | Como motorista, quero baixar previamente minha rota e os recursos do mapa, para consultá-los sem conexão. | RF08, RF64, RNF05, RNF09 |
-| US06.02 - Consultar rota baixada sem rede | Como motorista, quero abrir minha rota já baixada sem internet, para consultar o percurso e suas paradas. | RF08, RF64, RNF05 |
-| US06.03 - Guardar assinatura coletada offline | Como motorista, quero coletar e guardar a assinatura do recebedor sem internet, para preservar o comprovante até recuperar a conexão. | RF08, RF10, RNF04, RNF05, RNF11 |
-| US06.04 - Sincronizar assinaturas ao reconectar | Como motorista, quero que assinaturas pendentes sejam enviadas quando a conexão voltar, para completar o registro dos comprovantes. | RF08, RF24, RNF05 |
-| US06.05 - Receber atualizações em segundo plano | Como motorista, quero receber atualizações da programação em segundo plano, para consultar as informações disponíveis mais recentes. | RF24, RNF05, RNF09 |
-| US03.04 - Acompanhar a frota no mapa | Como gestor, quero acompanhar a localização e as tarefas dos motoristas no mapa, para conhecer o andamento da operação. | RF19, RF25, RF58, RNF03, RNF09 |
-| US09.02 - Registrar e reproduzir o trajeto | Como motorista, quero registrar o trajeto em segundo plano e reproduzi-lo depois, para analisar por onde passei. | RF28, RNF03, RNF09, RNF11 |
-| US11.01 - Utilizar uma interface adequada à condução | Como motorista, quero controles claros e legíveis, para consultar e operar o aplicativo com menor distração. | RNF07 |
+| ✅ US05.01 - Visualizar o trajeto no mapa | Como motorista, quero visualizar minha rota em um mapa interativo, para compreender o trajeto e as paradas. | RF05, RNF03, RNF07 |
+| ✅ US05.02 - Navegar com instruções visuais e de voz | Como motorista, quero receber instruções visuais e faladas para cada manobra, para seguir a rota durante a condução. | RF05, RNF03, RNF07, RNF09 |
+| ✅ US05.03 - Manter a localização durante a viagem | Como motorista, quero que minha localização continue sendo acompanhada durante a viagem, para manter o andamento da rota atualizado. | RF06, RNF03, RNF09 |
+| ✅ US05.04 - Recalcular após desvio com conexão | Como motorista, quero receber um novo trajeto quando sair da rota, para continuar até as paradas restantes. | RF06 |
+| ✅ US05.05 - Receber alertas de navegação | Como motorista, quero receber alertas de aproximação, desvio e excesso de velocidade, para perceber situações relevantes durante o percurso. | RF17, RNF07 |
+| ✅ US05.06 - Restringir interações durante movimento | Como motorista, quero que interações que exijam digitação sejam restringidas em movimento, para reduzir distrações. | RF53, RNF07 |
+| ✅ US05.07 - Consultar previsão de chegada | Como motorista, quero acompanhar a previsão de chegada a cada destino, para conhecer o andamento da jornada. | RF54 |
+| ✅ US06.01 - Baixar rota e mapa regional | Como motorista, quero baixar previamente minha rota e os recursos do mapa, para consultá-los sem conexão. | RF08, RF64, RNF05, RNF09 |
+| ✅ US06.02 - Consultar rota baixada sem rede | Como motorista, quero abrir minha rota já baixada sem internet, para consultar o percurso e suas paradas. | RF08, RF64, RNF05 |
+| ✅ US06.03 - Guardar assinatura coletada offline | Como motorista, quero coletar e guardar a assinatura do recebedor sem internet, para preservar o comprovante até recuperar a conexão. | RF08, RF10, RNF04, RNF05, RNF11 |
+| ✅ US06.04 - Sincronizar assinaturas ao reconectar | Como motorista, quero que assinaturas pendentes sejam enviadas quando a conexão voltar, para completar o registro dos comprovantes. | RF08, RF24, RNF05 |
+| ✅ US06.05 - Receber atualizações em segundo plano | Como motorista, quero receber atualizações da programação em segundo plano, para consultar as informações disponíveis mais recentes. | RF24, RNF05, RNF09 |
+| ✅ US03.04 - Acompanhar a frota no mapa | Como gestor, quero acompanhar a localização e as tarefas dos motoristas no mapa, para conhecer o andamento da operação. | RF19, RF25, RF58, RNF03, RNF09 |
+| ✅ US09.02 - Registrar e reproduzir o trajeto | Como motorista, quero registrar o trajeto em segundo plano e reproduzi-lo depois, para analisar por onde passei. | RF28, RNF03, RNF09, RNF11 |
+| ✅ US11.01 - Utilizar uma interface adequada à condução | Como motorista, quero controles claros e legíveis, para consultar e operar o aplicativo com menor distração. | RNF07 |
+
+> ✅ = entregue na Sprint 2 (implementada e testada; a maior parte conferida no aparelho com o backend e o mapa no PC). Pendências de validação (bateria e dados com o aparelho solto, build de release) e o que passa para a Sprint 3 estão em "Sprint 2 — entregue" e em "Próximas etapas", acima.
 
 ### Sprint 3 — Comunicação, histórico e acessibilidade
 Objetivo: Fechar o MVP com comunicação em emergência, histórico consultável e acessibilidade.
