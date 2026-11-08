@@ -31,8 +31,14 @@ import {AvisoDeRestricao, CampoDeTexto, IndicadorLocalizacaoConectado} from '../
 import {useRestricaoPorMovimento} from '../viewmodels/LocalizacaoViewModel';
 import {MENSAGEM_ENTRAR_PARA_COLETAR} from '../offline';
 import {useOffline} from '../viewmodels/OfflineViewModel';
-import {AvisoSemConexaoConectado, CartaoDeDownloadConectado, PainelDeEnviosConectado} from '../componentesOffline';
+import {
+  AvisoDeAtualizacaoConectado,
+  AvisoSemConexaoConectado,
+  CartaoDeDownloadConectado,
+  PainelDeEnviosConectado,
+} from '../componentesOffline';
 import {TelaMapa} from './TelaMapa';
+import {TelaViagens} from './TelaViagens';
 import SignatureScreen, {SignatureViewRef} from 'react-native-signature-canvas';
 import {
   CameraOptions,
@@ -77,9 +83,10 @@ type Fluxo =
   | 'assinatura'
   | 'foto'
   | 'mapa'
+  | 'viagens'
   | 'concluida';
 
-const FLUXOS_TELA_CHEIA: Fluxo[] = ['adicionar', 'verificar', 'status', 'assinatura', 'foto', 'mapa', 'concluida'];
+const FLUXOS_TELA_CHEIA: Fluxo[] = ['adicionar', 'verificar', 'status', 'assinatura', 'foto', 'mapa', 'viagens', 'concluida'];
 
 type Props = {
   usuario: Usuario;
@@ -206,6 +213,10 @@ export function TelaMotorista({usuario, rota, onAtualizarRota, onSair}: Props) {
   function telaDoFluxo() {
     if (fluxo === 'mapa') {
       return <TelaMapa rota={rota} onVoltar={() => setFluxo('rota')} />;
+    }
+
+    if (fluxo === 'viagens') {
+      return <TelaViagens usuarioId={usuario.id} onVoltar={() => setFluxo('base')} />;
     }
 
     if (fluxo === 'adicionar') {
@@ -551,6 +562,7 @@ export function TelaMotorista({usuario, rota, onAtualizarRota, onSair}: Props) {
             <IndicadorLocalizacaoConectado />
             <PainelDeEnviosConectado />
             <CartaoDeDownloadConectado rotaId={rota.id} />
+            <AvisoDeAtualizacaoConectado />
             {rota.paradas.map((parada, indice) => (
               <CardParada
                 key={parada.id}
@@ -660,7 +672,7 @@ export function TelaMotorista({usuario, rota, onAtualizarRota, onSair}: Props) {
 
   function conteudoAba() {
     if (aba === 'Perfil') {
-      return <PerfilUsuario usuario={usuario} onSair={onSair} />;
+      return <PerfilUsuario usuario={usuario} onSair={onSair} onAbrirViagens={() => setFluxo('viagens')} />;
     }
     if (aba === 'Notificações') {
       return (

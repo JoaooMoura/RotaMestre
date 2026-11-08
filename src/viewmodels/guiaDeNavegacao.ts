@@ -6,7 +6,15 @@ import {
   GuiaDeNavegacao,
   PlanoDeNavegacao,
 } from '../navegacao';
-import {Posicao} from '../localizacao';
+import {
+  avaliarVelocidade,
+  ESTADO_INICIAL_DA_VELOCIDADE,
+  EstadoDaVelocidade,
+  limiteEm,
+  textoDoExcesso,
+} from '../alertas';
+import {Posicao, velocidadeKmh} from '../localizacao';
+import {ServicoAlerta, servicoAlertaNulo} from '../servicos/alertaTipos';
 import {DisponibilidadeDaVoz, ServicoVoz} from '../servicos/vozTipos';
 import {Store} from './rastreamentoLocalizacao';
 
@@ -22,14 +30,22 @@ export const estadoInicialDaVoz: EstadoDaVoz = {disponibilidade: 'verificando', 
 
 export type ParametrosGuia = {
   plano: PlanoDeNavegacao;
+  /** O desvio foi confirmado (3 leituras fora da rota): é hora de pedir um novo trajeto (US05.04). */
+  aoDesvio?: () => void;
+  /** O veículo voltou ao trajeto: um recálculo em andamento deixa de ser necessário. */
+  aoRetorno?: () => void;
   posicaoStore: Store<Posicao | null>;
   voz: ServicoVoz;
+  /** Vibração dos alertas; omitido, só há tela e voz. */
+  alerta?: ServicoAlerta;
   aoGuia: (guia: GuiaDeNavegacao) => void;
   aoEstadoDaVoz: (estado: EstadoDaVoz) => void;
 };
 
 export type Guia = {
   parar: () => void;
+  /** Troca o trajeto (recálculo bem-sucedido): a orientação recomeça no novo plano, sem repetir "Navegação iniciada". */
+  trocarPlano: (novo: PlanoDeNavegacao) => void;
   /** A localização está confiável (true) ou perdida/desatualizada (false). */
   definirLocalizacaoConfiavel: (confiavel: boolean) => void;
   definirVozLigada: (ligada: boolean) => void;
@@ -44,12 +60,23 @@ const TEXTO_SINAL_RECUPERADO = 'Sinal de GPS recuperado.';
  * Acompanha as posições, avança a orientação e fala os avisos. Não depende de React: o ViewModel
  * só liga `aoGuia` e `aoEstadoDaVoz` ao estado da tela. `parar()` libera a assinatura e a voz.
  */
-export function iniciarGuia({plano, posicaoStore, voz, aoGuia, aoEstadoDaVoz}: ParametrosGuia): Guia {
+export function iniciarGuia({
+  plano: planoInicial,
+  posicaoStore,
+  voz,
+  alerta = servicoAlertaNulo,
+  aoDesvio,
+  aoRetorno,
+  aoGuia,
+  aoEstadoDaVoz,
+}: ParametrosGuia): Guia {
+  let plano = planoInicial;
   let encerrado = false;
   let estado: EstadoDeNavegacao = estadoInicialDeNavegacao(plano);
   let estadoDaVoz: EstadoDaVoz = estadoInicialDaVoz;
   let confiavel = true;
   let ultimaPosicao: Posicao | null = null;
+  let estadoDaVelocidade: EstadoDaVelocidade = ESTADO_INICIAL_DA_VELOCIDADE;
 
   function atualizarVoz(parcial: Partial<EstadoDaVoz>) {
     if (encerrado) {
@@ -75,14 +102,41 @@ export function iniciarGuia({plano, posicaoStore, voz, aoGuia, aoEstadoDaVoz}: P
     if (encerrado || !posicao || posicao === ultimaPosicao || estadoDaVoz.disponibilidade === 'verificando') {
       return;
     }
+    const anterior = ultimaPosicao;
     ultimaPosicao = posicao;
     if (!confiavel) {
       return;
     }
     const resultado = avancarNavegacao(plano, estado, posicao);
     estado = resultado.estado;
-    aoGuia(resultado.guia);
-    resultado.anuncios.forEach((anuncio: Anuncio) => falar(anuncio.texto, anuncio.urgente));
+
+    // Velocidade x limite validado (US05.05). Fora da rota o trecho é desconhecido: sem limite.
+    const limiteKmh = resultado.guia.foraDaRota ? null : limiteEm(plano, resultado.guia.progressoM);
+    const velocidade = avaliarVelocidade(estadoDaVelocidade, {
+      kmh: velocidadeKmh(posicao, anterior),
+      limiteKmh,
+      precisaoM: posicao.precisaoM,
+      agora: posicao.recebidaEm,
+    });
+    estadoDaVelocidade = velocidade.estado;
+    aoGuia({...resultado.guia, velocidade: velocidade.info});
+
+    resultado.anuncios.forEach((anuncio: Anuncio) => {
+      falar(anuncio.texto, anuncio.urgente);
+      if (anuncio.tipo === 'saiuDaRota') {
+        alerta.sinalizar('desvio');
+        aoDesvio?.();
+      } else if (anuncio.tipo === 'voltouParaRota') {
+        aoRetorno?.();
+      } else if (anuncio.daParada) {
+        alerta.sinalizar('aproximacao');
+      }
+    });
+    if (velocidade.alertar) {
+      // Não interrompe uma instrução de manobra em andamento: entra na fila da fala.
+      falar(textoDoExcesso(velocidade.info), false);
+      alerta.sinalizar('velocidade');
+    }
   }
 
   async function verificarVoz() {
@@ -106,6 +160,17 @@ export function iniciarGuia({plano, posicaoStore, voz, aoGuia, aoEstadoDaVoz}: P
       encerrado = true;
       cancelarAssinatura();
       voz.parar().catch(() => {});
+    },
+
+    trocarPlano(novo) {
+      if (encerrado) {
+        return;
+      }
+      plano = novo;
+      estado = {...estadoInicialDeNavegacao(novo), iniciou: true};
+      falar(novo.textoInicial ? `Rota recalculada. ${novo.textoInicial}` : 'Rota recalculada.', true);
+      ultimaPosicao = null;
+      aoPosicao(posicaoStore.obter());
     },
 
     definirLocalizacaoConfiavel(novo) {

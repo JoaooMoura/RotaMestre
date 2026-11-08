@@ -1,5 +1,6 @@
 import {distanciaMetros, PontoGeografico, projetarNoSegmento} from './geo';
 import {ContextoDaManobra, iconeDaManobra, NomeDeIcone, textoDaManobra, textoDeAviso} from './instrucoes';
+import type {InfoDeVelocidade} from './alertas';
 import {Manobra, Trajeto} from './tipos';
 
 export const POLITICA_NAVEGACAO = {
@@ -31,6 +32,8 @@ export type PlanoDeNavegacao = {
   totalM: number;
   duracaoS: number;
   manobras: ManobraPlanejada[];
+  /** Limites validados por distância percorrida (`deM`); `kmh` nulo = indisponível. Em ordem crescente. */
+  limites: {deM: number; kmh: number | null}[];
   /** Instrução de saída ("Siga pela Rua X"), dita ao iniciar. */
   textoInicial: string | null;
 };
@@ -44,7 +47,8 @@ export function criarPlano(trajeto: Trajeto): PlanoDeNavegacao {
 
   const ultimaPerna = trajeto.manobras.reduce((maior, m) => Math.max(maior, m.perna), 0);
   const manobras = trajeto.manobras.map<ManobraPlanejada>(m => {
-    const contexto: ContextoDaManobra = {numeroDaParada: m.perna + 2, destinoFinal: m.perna === ultimaPerna};
+    const numeroDaParada = trajeto.paradas[m.perna + 1]?.numero ?? m.perna + 2;
+    const contexto: ContextoDaManobra = {numeroDaParada, destinoFinal: m.perna === ultimaPerna};
     return {
       ...m,
       posicaoM: acumuladoM[Math.min(m.indice, acumuladoM.length - 1)] ?? 0,
@@ -54,6 +58,11 @@ export function criarPlano(trajeto: Trajeto): PlanoDeNavegacao {
     };
   });
 
+  const limites = (trajeto.limites ?? [])
+    .filter(l => Number.isInteger(l.indice) && l.indice >= 0 && (l.kmh === null || (Number.isFinite(l.kmh) && l.kmh > 0)))
+    .map(l => ({deM: acumuladoM[Math.min(l.indice, acumuladoM.length - 1)] ?? 0, kmh: l.kmh}))
+    .sort((a, b) => a.deM - b.deM);
+
   const saida = manobras.find(m => m.tipo === 'depart');
   return {
     pontos,
@@ -61,6 +70,7 @@ export function criarPlano(trajeto: Trajeto): PlanoDeNavegacao {
     totalM: acumuladoM[acumuladoM.length - 1] ?? 0,
     duracaoS: trajeto.duracaoS,
     manobras,
+    limites,
     textoInicial: saida?.texto ?? null,
   };
 }
@@ -134,6 +144,8 @@ export type Anuncio = {
   texto: string;
   /** Interrompe a fala em andamento (manobra iminente). */
   urgente: boolean;
+  /** O aviso é sobre a chegada a uma parada ou ao destino (aproximação, US05.05). */
+  daParada?: boolean;
 };
 
 export type EstadoDeNavegacao = {
@@ -158,6 +170,8 @@ export type GuiaDeNavegacao = {
   foraDaRota: boolean;
   distanciaDaRotaM: number;
   chegou: boolean;
+  /** Velocidade e limite validado (US05.05); preenchido pelo guia a cada leitura. */
+  velocidade: InfoDeVelocidade;
 };
 
 export function estadoInicialDeNavegacao(plano: PlanoDeNavegacao): EstadoDeNavegacao {
@@ -188,6 +202,7 @@ function montarGuia(plano: PlanoDeNavegacao, estado: EstadoDeNavegacao, distanci
     foraDaRota: estado.foraDaRota,
     distanciaDaRotaM,
     chegou: estado.chegou,
+    velocidade: {kmh: null, limiteKmh: null, excesso: false},
   };
 }
 
@@ -265,7 +280,7 @@ export function avancarNavegacao(plano: PlanoDeNavegacao, anterior: EstadoDeNave
 
     if (manobra.tipo === 'arrive' && distancia <= chegadaM) {
       const final = manobra.contexto.destinoFinal !== false;
-      anuncios.push({tipo: final ? 'chegada' : 'chegadaParada', texto: manobra.texto, urgente: true});
+      anuncios.push({tipo: final ? 'chegada' : 'chegadaParada', texto: manobra.texto, urgente: true, daParada: true});
       if (final) {
         estado.chegou = true;
       } else {
@@ -274,10 +289,15 @@ export function avancarNavegacao(plano: PlanoDeNavegacao, anterior: EstadoDeNave
     } else if (distancia <= avisoProximoM && !marcas.proximo) {
       estado.anunciadas[estado.proximaManobra] = {distante: true, proximo: true};
       const texto = manobra.tipo === 'arrive' ? `${manobra.contexto.destinoFinal === false ? 'A parada' : 'O destino'} está logo à frente` : manobra.texto;
-      anuncios.push({tipo: 'proximidade', texto, urgente: true});
+      anuncios.push({tipo: 'proximidade', texto, urgente: true, daParada: manobra.tipo === 'arrive'});
     } else if (distancia <= avisoDistanteM && !marcas.distante) {
       estado.anunciadas[estado.proximaManobra] = {...marcas, distante: true};
-      anuncios.push({tipo: 'aviso', texto: textoDeAviso(manobra, distancia, manobra.contexto), urgente: false});
+      anuncios.push({
+        tipo: 'aviso',
+        texto: textoDeAviso(manobra, distancia, manobra.contexto),
+        urgente: false,
+        daParada: manobra.tipo === 'arrive',
+      });
     }
   }
 

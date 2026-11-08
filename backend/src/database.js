@@ -145,6 +145,20 @@ function criarRepositorio(caminhoBanco, {seedDemo = false} = {}) {
       FOREIGN KEY (rota_id) REFERENCES rotas(id) ON DELETE CASCADE
     );
 
+    -- Última posição conhecida de cada motorista com rota em andamento (US03.04). UMA linha por motorista,
+    -- sempre sobrescrita: não há histórico no servidor. Só guarda o necessário para o gestor ver no mapa:
+    -- coordenadas, precisão, hora da leitura, hora do recebimento e a rota. Velocidade, rumo e trajeto NÃO são guardados.
+    CREATE TABLE IF NOT EXISTS posicoes_motoristas (
+      motorista_id TEXT PRIMARY KEY,
+      rota_id TEXT NOT NULL,
+      latitude REAL NOT NULL,
+      longitude REAL NOT NULL,
+      precisao_m REAL,
+      registrada_em INTEGER NOT NULL,
+      recebida_em INTEGER NOT NULL,
+      FOREIGN KEY (motorista_id) REFERENCES motoristas(id) ON DELETE CASCADE
+    );
+
     -- Comprovantes coletados sem rede e enviados depois (US06.04). Cada envio tem um id gerado no
     -- aparelho: repetir o mesmo id devolve o mesmo resultado, sem criar outro comprovante.
     CREATE TABLE IF NOT EXISTS envios_comprovante (
@@ -712,6 +726,85 @@ function criarRepositorio(caminhoBanco, {seedDemo = false} = {}) {
     }
   }
 
+  function registrarPosicao(motoristaId, posicao, retencaoMs) {
+    // Quem parou de atualizar (ex.: saiu da conta) não fica guardado para sempre, nem sem o gestor consultar.
+    if (retencaoMs !== undefined) {
+      banco.prepare('DELETE FROM posicoes_motoristas WHERE recebida_em < ?').run(posicao.recebidaEm - retencaoMs);
+    }
+    banco
+      .prepare(`
+        INSERT INTO posicoes_motoristas (motorista_id, rota_id, latitude, longitude, precisao_m, registrada_em, recebida_em)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(motorista_id) DO UPDATE SET
+          rota_id = excluded.rota_id,
+          latitude = excluded.latitude,
+          longitude = excluded.longitude,
+          precisao_m = excluded.precisao_m,
+          registrada_em = excluded.registrada_em,
+          recebida_em = excluded.recebida_em
+      `)
+      .run(
+        motoristaId,
+        posicao.rotaId,
+        posicao.latitude,
+        posicao.longitude,
+        posicao.precisaoM ?? null,
+        posicao.registradaEm,
+        posicao.recebidaEm,
+      );
+  }
+
+  function removerPosicao(motoristaId) {
+    banco.prepare('DELETE FROM posicoes_motoristas WHERE motorista_id = ?').run(motoristaId);
+  }
+
+  /**
+   * Frota para o gestor: cada motorista com rota em andamento ou pausada, o andamento das paradas e a última
+   * posição (só de rota em andamento e da rota atual). Posições mais velhas que `retencaoMs` são apagadas.
+   */
+  function listarFrota(agora, retencaoMs) {
+    banco.prepare('DELETE FROM posicoes_motoristas WHERE recebida_em < ?').run(agora - retencaoMs);
+    const frota = [];
+    for (const motorista of listarMotoristas()) {
+      const rota = buscarRotaAtual(motorista.id);
+      if (!rota || (rota.status !== 'Em andamento' && rota.status !== 'Pausada')) {
+        continue;
+      }
+      const encerradas = rota.paradas.filter(p => p.status === 'Concluída' || p.status === 'Não realizada').length;
+      const proxima = rota.paradas.find(p => p.status === 'Pendente' || p.status === 'Em andamento');
+      const linha =
+        rota.status === 'Em andamento'
+          ? banco
+              .prepare(
+                'SELECT rota_id, latitude, longitude, precisao_m, registrada_em, recebida_em FROM posicoes_motoristas WHERE motorista_id = ?',
+              )
+              .get(motorista.id)
+          : undefined;
+      frota.push({
+        motoristaId: motorista.id,
+        nome: motorista.nome,
+        veiculo: motorista.veiculo,
+        rota: {id: rota.id, nome: rota.nome, status: rota.status},
+        paradas: {
+          total: rota.paradas.length,
+          encerradas,
+          proxima: proxima ? {id: proxima.id, destinatario: proxima.destinatario, tipo: proxima.tipo} : null,
+        },
+        posicao:
+          linha && linha.rota_id === rota.id
+            ? {
+                latitude: linha.latitude,
+                longitude: linha.longitude,
+                precisaoM: linha.precisao_m,
+                registradaEm: linha.registrada_em,
+                idadeMs: Math.max(0, agora - linha.recebida_em),
+              }
+            : null,
+      });
+    }
+    return frota;
+  }
+
   function criarGestor(gestor) {
     inserirUsuario({...gestor, papel: 'gestor'});
   }
@@ -724,6 +817,9 @@ function criarRepositorio(caminhoBanco, {seedDemo = false} = {}) {
     buscarTrajeto,
     buscarUsuario,
     registrarComprovanteEnviado,
+    registrarPosicao,
+    removerPosicao,
+    listarFrota,
     listarMotoristas,
     salvarMotorista,
     salvarRota,

@@ -67,6 +67,10 @@ export type Coordenada = [longitude: number, latitude: number];
 
 export type ParadaNoMapa = {
   id: string;
+  /** Posição da parada na rota original, começando em 1 (ausente: vale a posição na lista). */
+  numero?: number;
+  /** Ponto de partida de um trajeto recalculado (a posição do veículo): não é uma parada de verdade. */
+  origem?: boolean;
   tipo: TipoParada;
   destinatario: string;
   endereco: string;
@@ -90,15 +94,35 @@ export type Manobra = {
   perna: number;
 };
 
+/** Limite de velocidade validado a partir do ponto `indice` da geometria; `kmh` nulo = sem limite conhecido. */
+export type LimiteDoTrecho = {indice: number; kmh: number | null};
+
 export type Trajeto = {
   rotaId: string;
+  /** Calculado a partir da posição do veículo até as paradas que faltam (US05.04). */
+  recalculado?: boolean;
   geometria: {type: 'LineString'; coordinates: Coordenada[]};
   distanciaM: number;
   duracaoS: number;
   calculadoEm: number;
   manobras: Manobra[];
+  /** Ausente em trajetos baixados antes da US05.05: equivale a nenhum limite conhecido. */
+  limites?: LimiteDoTrecho[];
   paradas: ParadaNoMapa[];
 };
+
+/** Um motorista com rota em andamento ou pausada, como o gestor o vê no mapa (US03.04). */
+export type MotoristaNaFrota = {
+  motoristaId: string;
+  nome: string;
+  veiculo: string;
+  rota: {id: string; nome: string; status: 'Em andamento' | 'Pausada'};
+  paradas: {total: number; encerradas: number; proxima: {id: string; destinatario: string; tipo: TipoParada} | null};
+  /** Última posição recebida; nula se não há (ou se a rota está pausada). `idadeMs` é contada pelo servidor. */
+  posicao: {latitude: number; longitude: number; precisaoM: number | null; registradaEm: number; idadeMs: number} | null;
+};
+
+export type Frota = {geradoEm: number; motoristas: MotoristaNaFrota[]};
 
 export type Rota = {
   id: string;

@@ -1,4 +1,4 @@
-import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
+import React from 'react';
 import {ActivityIndicator, Alert, Text, View} from 'react-native';
 import {SafeAreaProvider, SafeAreaView} from 'react-native-safe-area-context';
 import {MaterialDesignIcons} from '@react-native-vector-icons/material-design-icons';
@@ -8,17 +8,22 @@ import {primeiroNome} from './src/nomes';
 import {TelaAutenticacao} from './src/telas/TelaAutenticacao';
 import {TelaGestorSprint} from './src/telas/TelaGestorSprint';
 import {TelaMotorista} from './src/telas/TelaMotorista';
-import {Rota, Usuario} from './src/tipos';
-import {guardaSessaoDe, ResumoDoPacote} from './src/offline';
-import {armazenamentoOfflineSeguro} from './src/servicos/armazenamentoOffline';
-import {useOperacaoViewModel} from './src/viewmodels/OperacaoViewModel';
 import {LocalizacaoProvider} from './src/viewmodels/LocalizacaoViewModel';
 import {servicoTelaNativo} from './src/servicos/servicoTela';
+import {servicoAlertaNativo} from './src/servicos/servicoAlerta';
 import {servicoVozNativo} from './src/servicos/servicoVoz';
 import {dependenciasLocalizacaoPadrao} from './src/viewmodels/dependenciasLocalizacao';
-import {OfflineProvider, useOfflineViewModel} from './src/viewmodels/OfflineViewModel';
+import {Rota} from './src/tipos';
+import {useAppViewModel} from './src/viewmodels/AppViewModel';
+import {OfflineProvider} from './src/viewmodels/OfflineViewModel';
+import {CompartilhamentoProvider} from './src/viewmodels/CompartilhamentoViewModel';
+import {RegistroDeViagemProvider} from './src/viewmodels/ViagensViewModel';
+import {AtualizacaoProvider, dependenciasDaAtualizacaoPadrao} from './src/viewmodels/AtualizacaoViewModel';
+import {agendadorNativo} from './src/servicos/agendadorDeAtualizacao';
 import {NavegacaoProvider} from './src/viewmodels/NavegacaoViewModel';
 import {SessaoProvider, useSessao} from './src/viewmodels/SessaoViewModel';
+
+const dependenciasDeAtualizacao = {...dependenciasDaAtualizacaoPadrao, agendador: agendadorNativo};
 
 function Carregando({mensagem}: {mensagem: string}) {
   return (
@@ -30,102 +35,23 @@ function Carregando({mensagem}: {mensagem: string}) {
 }
 
 function ConteudoApp() {
-  const {usuario: usuarioDaSessao, usuarioGuardado, restaurando, sair: sairDaSessao} = useSessao();
-  // Sem sessão válida (ex.: expirou), o motorista pode abrir a rota já baixada neste aparelho (PV05).
-  const [usuarioLocal, setUsuarioLocal] = useState<Usuario | null>(null);
-  const [resumoBaixado, setResumoBaixado] = useState<ResumoDoPacote | null>(null);
-  const usuario = usuarioDaSessao ?? usuarioLocal;
-  const semSessao = usuarioDaSessao === null && usuarioLocal !== null;
-  // Sem login: coletar assinatura só se o aparelho guarda a sessão DESTE motorista (Manter conectado); senão, só leitura.
-  const podeColetarSemEntrar = guardaSessaoDe(usuarioGuardado, resumoBaixado?.usuarioId);
-  const somenteLeitura = semSessao && !guardaSessaoDe(usuarioGuardado, usuarioLocal?.id);
-  const offlineBase = useOfflineViewModel(usuario, undefined, {sessaoAtiva: usuarioDaSessao !== null});
-  const servicoOffline = useMemo(
-    () => ({
-      lerPacote: armazenamentoOfflineSeguro.lerPacote,
-      listarPendencias: armazenamentoOfflineSeguro.listarPendencias,
-      registrarPendencia: offlineBase.registrarPendencia,
-      atualizarRotaDoPacote: async (usuarioId: string, rota: Rota) => {
-        const pacote = await armazenamentoOfflineSeguro.lerPacote(usuarioId);
-        // Só acompanha a mesma rota; o pacote de outra rota continua valendo para o que foi baixado.
-        if (pacote && pacote.rota.id === rota.id) {
-          await armazenamentoOfflineSeguro.salvarPacote({...pacote, rota});
-        }
-      },
-    }),
-    [offlineBase.registrarPendencia],
-  );
-  const {estado, recarregar, atualizarRota, tentarReconectar} = useOperacaoViewModel(usuario, undefined, servicoOffline, {
-    somenteLocal: semSessao,
-    somenteLeitura,
-  });
-  const semConexao = estado.tipo === 'pronto' && estado.offline !== undefined;
-  const offline = useMemo(
-    () => ({...offlineBase, semConexao, semSessao, somenteLeitura}),
-    [offlineBase, semConexao, semSessao, somenteLeitura],
-  );
-
-  useEffect(() => {
-    if (usuarioDaSessao) {
-      setUsuarioLocal(null);
-    }
-  }, [usuarioDaSessao]);
-
-  // Voltou ao servidor? Primeiro sai o que foi coletado sem rede (laço do OfflineViewModel); com tudo
-  // enviado, a tela troca a rota baixada pela do servidor. Quando uma assinatura tem desfecho (aceita
-  // ou rejeitada), a rota é recarregada para refletir o que o servidor decidiu.
-  const pendentesParaEnviar = offline.pendencias.some(p => p.status === 'pendente');
-  const desfechos = offline.desfechos;
-  const desfechosVistos = useRef(0);
-  useEffect(() => {
-    if (desfechos === desfechosVistos.current) {
-      return;
-    }
-    desfechosVistos.current = desfechos;
-    if (estado.tipo === 'pronto' && estado.offline) {
-      tentarReconectar();
-    } else if (usuarioDaSessao) {
-      recarregar();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [desfechos]);
-  useEffect(() => {
-    if (!usuarioDaSessao || pendentesParaEnviar || !(estado.tipo === 'pronto' && estado.offline)) {
-      return undefined;
-    }
-    const id = setInterval(() => {
-      tentarReconectar();
-    }, 15000);
-    return () => clearInterval(id);
-  }, [usuarioDaSessao, pendentesParaEnviar, estado, tentarReconectar]);
-
-  useEffect(() => {
-    if (usuarioDaSessao || restaurando) {
-      return;
-    }
-    armazenamentoOfflineSeguro.lerResumo().then(setResumoBaixado, () => setResumoBaixado(null));
-  }, [usuarioDaSessao, restaurando, usuarioLocal]);
-
-  const abrirRotaBaixada = useCallback(async () => {
-    if (!resumoBaixado) {
-      return;
-    }
-    const pacote = await armazenamentoOfflineSeguro.lerPacote(resumoBaixado.usuarioId).catch(() => null);
-    if (pacote) {
-      setUsuarioLocal(pacote.usuario);
-    }
-  }, [resumoBaixado]);
-
-  const sair = useCallback(() => {
-    if (usuarioDaSessao) {
-      sairDaSessao();
-    } else {
-      setUsuarioLocal(null);
-    }
-  }, [usuarioDaSessao, sairDaSessao]);
-
-  const rotaEmAndamento =
-    usuario?.papel === 'motorista' && estado.tipo === 'pronto' && estado.rota.status === 'Em andamento';
+  const sessao = useSessao();
+  const {
+    restaurando,
+    usuario,
+    estado,
+    offline,
+    resumoBaixado,
+    podeColetarSemEntrar,
+    rotaEmAndamento,
+    compartilharPosicao,
+    viagemParaGravar,
+    atualizarEmSegundoPlano,
+    recarregar,
+    atualizarRota,
+    abrirRotaBaixada,
+    sair,
+  } = useAppViewModel(sessao);
 
   async function salvar(rota: Rota) {
     const resultado = await atualizarRota(rota);
@@ -217,9 +143,17 @@ function ConteudoApp() {
 
   return (
     <LocalizacaoProvider ativo={rotaEmAndamento} dependencias={dependenciasLocalizacaoPadrao}>
-      <NavegacaoProvider voz={servicoVozNativo} tela={servicoTelaNativo}>
-        <OfflineProvider valor={offline}>{conteudo()}</OfflineProvider>
-      </NavegacaoProvider>
+      <CompartilhamentoProvider ativo={compartilharPosicao}>
+        <RegistroDeViagemProvider viagem={viagemParaGravar}>
+          <NavegacaoProvider voz={servicoVozNativo} tela={servicoTelaNativo} alerta={servicoAlertaNativo}>
+            <OfflineProvider valor={offline}>
+              <AtualizacaoProvider ativo={atualizarEmSegundoPlano} dependencias={dependenciasDeAtualizacao}>
+                {conteudo()}
+              </AtualizacaoProvider>
+            </OfflineProvider>
+          </NavegacaoProvider>
+        </RegistroDeViagemProvider>
+      </CompartilhamentoProvider>
     </LocalizacaoProvider>
   );
 }

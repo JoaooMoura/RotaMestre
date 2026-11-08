@@ -3,6 +3,9 @@ import {Keyboard, Pressable, Text, TextInput, TextInputProps, View} from 'react-
 import {MaterialDesignIcons} from '@react-native-vector-icons/material-design-icons';
 import {cores, estilos} from './estilos';
 import {descreverIdade, idadeMs, Posicao} from './localizacao';
+import {useCompartilhamento} from './viewmodels/CompartilhamentoViewModel';
+import {EstadoDoRegistro} from './viewmodels/registroDeViagem';
+import {useEstadoDoRegistro} from './viewmodels/ViagensViewModel';
 import {useLocalizacao, usePosicaoAtual} from './viewmodels/LocalizacaoViewModel';
 import {EstadoLocalizacao} from './viewmodels/rastreamentoLocalizacao';
 
@@ -122,6 +125,7 @@ export function IndicadorLocalizacao({descricao, aoAcionar}: {descricao: Descric
 /** Indicador ligado ao ViewModel; reavalia a idade a cada segundo só enquanto a posição está desatualizada. */
 export function IndicadorLocalizacaoConectado() {
   const localizacao = useLocalizacao();
+  const estadoDoRegistro = useEstadoDoRegistro();
   const posicao = usePosicaoAtual();
   const [, atualizar] = useReducer((valor: number) => valor + 1, 0);
   const desatualizada = localizacao.estado.tipo === 'ativa' && localizacao.estado.desatualizada;
@@ -139,17 +143,70 @@ export function IndicadorLocalizacaoConectado() {
     return null;
   }
   return (
-    <IndicadorLocalizacao
-      descricao={descricao}
-      aoAcionar={tipo => {
-        if (tipo === 'tentarNovamente') {
-          localizacao.tentarNovamente();
-        } else {
-          localizacao.abrirConfiguracoes(tipo === 'configuracoesDoAplicativo' ? 'aplicativo' : 'localizacao');
-        }
-      }}
-    />
+    <>
+      <IndicadorLocalizacao
+        descricao={descricao}
+        aoAcionar={tipo => {
+          if (tipo === 'tentarNovamente') {
+            localizacao.tentarNovamente();
+          } else {
+            localizacao.abrirConfiguracoes(tipo === 'configuracoesDoAplicativo' ? 'aplicativo' : 'localizacao');
+          }
+        }}
+      />
+      <AvisoDeCompartilhamentoConectado />
+      <AvisoDeRegistro estado={estadoDoRegistro} />
+    </>
   );
+}
+
+/** Avisa o motorista, em texto, que a posição está sendo compartilhada com o gestor (ou que não está chegando). */
+export function AvisoDeCompartilhamento({estado}: {estado: 'inativo' | 'ativo' | 'falhou'}) {
+  if (estado === 'inativo') {
+    return null;
+  }
+  const falhou = estado === 'falhou';
+  const texto = falhou
+    ? 'Sem conexão: o gestor não está recebendo sua localização agora.'
+    : 'Sua localização é compartilhada com o gestor enquanto a rota estiver em andamento.';
+  return (
+    <View style={estilos.localizacaoLinha} accessible accessibilityLabel={texto}>
+      <MaterialDesignIcons
+        name={falhou ? 'cloud-off-outline' : 'share-variant-outline'}
+        size={24}
+        color={falhou ? cores.acentoTexto : cores.textoApoio}
+      />
+      <Text style={[estilos.textoApoio, estilos.flex, falhou && {color: cores.acentoTexto}]}>{texto}</Text>
+    </View>
+  );
+}
+
+/** Diz, em texto, que o trajeto está sendo gravado no aparelho (ou que não está). */
+export function AvisoDeRegistro({estado}: {estado: EstadoDoRegistro}) {
+  if (estado === 'inativo') {
+    return null;
+  }
+  const problema = estado !== 'gravando';
+  const texto =
+    estado === 'gravando'
+      ? 'Seu trajeto está sendo gravado neste aparelho.'
+      : estado === 'cheio'
+        ? 'Limite de pontos da viagem atingido: o trajeto não está mais sendo gravado.'
+        : 'Não foi possível gravar o trajeto neste aparelho. Confira o espaço livre.';
+  return (
+    <View style={estilos.localizacaoLinha} accessible accessibilityLabel={texto}>
+      <MaterialDesignIcons
+        name={problema ? 'alert-circle-outline' : 'map-marker-path'}
+        size={24}
+        color={problema ? cores.acentoTexto : cores.textoApoio}
+      />
+      <Text style={[estilos.textoApoio, estilos.flex, problema && {color: cores.acentoTexto}]}>{texto}</Text>
+    </View>
+  );
+}
+
+export function AvisoDeCompartilhamentoConectado() {
+  return <AvisoDeCompartilhamento estado={useCompartilhamento()} />;
 }
 
 /** Aviso de que a digitação está bloqueada porque o veículo está em movimento. */

@@ -490,9 +490,11 @@ const NOME_PAPEL: Record<Usuario['papel'], string> = {
 type PerfilUsuarioProps = {
   usuario: Usuario;
   onSair: () => void;
+  /** Motorista: abre as viagens gravadas neste aparelho (US09.02). */
+  onAbrirViagens?: () => void;
 };
 
-export function PerfilUsuario({usuario, onSair}: PerfilUsuarioProps) {
+export function PerfilUsuario({usuario, onSair, onAbrirViagens}: PerfilUsuarioProps) {
   return (
     <LayoutFaixa
       faixa={
@@ -528,6 +530,11 @@ export function PerfilUsuario({usuario, onSair}: PerfilUsuarioProps) {
         </View>
       </View>
 
+      {onAbrirViagens ? (
+        <View style={estilos.perfilBotao}>
+          <BotaoContornado titulo="Minhas viagens" icone="history" onPress={onAbrirViagens} />
+        </View>
+      ) : null}
       <BotaoContornado titulo="Sair da conta" icone="logout" perigo onPress={onSair} />
       <View style={estilos.perfilRodape}>
         <MaterialDesignIcons name="information-outline" size={16} color={cores.textoApoio} />

@@ -49,7 +49,7 @@ export function calcularPrevisoes(
     }
     const posicao = posicoes[indice];
     if (posicao === null || velocidadeMs <= 0) {
-      previsoes.push({paradaId: parada.id, numero: indice + 1, destinatario: parada.destinatario, chegadaEm: null, distanciaM: 0});
+      previsoes.push({paradaId: parada.id, numero: parada.numero ?? indice + 1, destinatario: parada.destinatario, chegadaEm: null, distanciaM: 0});
       return;
     }
     // Parada que ficou para trás sem ser concluída não será atendida no caminho: não soma serviço.
@@ -58,7 +58,7 @@ export function calcularPrevisoes(
     const viagemS = distanciaM / velocidadeMs;
     previsoes.push({
       paradaId: parada.id,
-      numero: indice + 1,
+      numero: parada.numero ?? indice + 1,
       destinatario: parada.destinatario,
       chegadaEm: agora + (viagemS + servicosAntes * POLITICA_PREVISAO.servicoPorParadaS) * 1000,
       distanciaM,

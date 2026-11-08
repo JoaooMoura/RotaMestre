@@ -10,6 +10,7 @@ const {
 } = require('./autenticacao');
 const {criarRepositorio} = require('./database');
 const {criarServicoRoteamento, hashDosPontos} = require('./roteamento');
+const {carregarLimites, criarIndiceDeLimites} = require('./limites');
 
 const TIPOS_PARADA = new Set(['Coleta', 'Entrega']);
 const STATUS_PARADA = new Set([
@@ -145,6 +146,49 @@ function coordenadasValidas({latitude, longitude}) {
   );
 }
 
+function posicaoValida(corpo) {
+  return (
+    corpo !== null &&
+    typeof corpo === 'object' &&
+    Number.isFinite(corpo.latitude) &&
+    Number.isFinite(corpo.longitude) &&
+    Math.abs(corpo.latitude) <= 90 &&
+    Math.abs(corpo.longitude) <= 180
+  );
+}
+
+// Paradas que ainda faltam: o recálculo nunca passa por uma parada concluída ou não realizada.
+const STATUS_PARADA_ENCERRADA = new Set(['Concluída', 'Não realizada']);
+
+// Posição do motorista (US03.04): só a última é guardada. Leituras de mais de 10 min atrás não valem.
+const IDADE_MAXIMA_DA_LEITURA_MS = 10 * 60 * 1000;
+const TOLERANCIA_DE_RELOGIO_MS = 2 * 60 * 1000;
+// Posição que ninguém atualiza some depois de 12 h.
+const RETENCAO_DA_POSICAO_MS = 12 * 60 * 60 * 1000;
+
+function validarPosicaoCompartilhada(corpo, agora) {
+  if (!posicaoValida(corpo)) {
+    return {erro: 'Informe a posição atual (latitude e longitude válidas).'};
+  }
+  const {precisaoM} = corpo;
+  if (precisaoM !== undefined && precisaoM !== null && !(Number.isFinite(precisaoM) && precisaoM >= 0 && precisaoM <= 100000)) {
+    return {erro: 'Precisão inválida.'};
+  }
+  let registradaEm = agora;
+  if (corpo.registradaEm !== undefined) {
+    if (!Number.isFinite(corpo.registradaEm)) {
+      return {erro: 'Hora da leitura inválida.'};
+    }
+    if (corpo.registradaEm < agora - IDADE_MAXIMA_DA_LEITURA_MS) {
+      return {erro: 'Leitura antiga demais para ser mostrada como posição atual.'};
+    }
+    registradaEm = Math.min(corpo.registradaEm, agora + TOLERANCIA_DE_RELOGIO_MS);
+  }
+  return {
+    posicao: {latitude: corpo.latitude, longitude: corpo.longitude, precisaoM: precisaoM ?? null, registradaEm},
+  };
+}
+
 function temLocalizacao(parada) {
   return parada.latitude !== undefined && parada.longitude !== undefined;
 }
@@ -200,7 +244,7 @@ function validarRota(rota) {
 function responder(resposta, status, corpo) {
   resposta.writeHead(status, {
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-    'Access-Control-Allow-Methods': 'GET, POST, PUT, OPTIONS',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
     'Access-Control-Allow-Origin': '*',
     'Content-Type': 'application/json; charset=utf-8',
   });
@@ -259,6 +303,8 @@ function criarServidor({
   seedDemo = false,
   urlOsrm = 'http://127.0.0.1:5000',
   servicoRoteamento = criarServicoRoteamento({urlOsrm}),
+  servicoLimites = criarIndiceDeLimites([]),
+  agora = Date.now,
 }) {
   validarSegredoJwt(segredoJwt);
   validarValidadeToken(validadeToken);
@@ -399,6 +445,8 @@ function criarServidor({
           duracaoS: trajeto.duracaoS,
           calculadoEm: trajeto.calculadoEm,
           manobras: trajeto.manobras ?? [],
+          // Limites validados (maxspeed explícito); onde não há, kmh é nulo. Calculado na resposta, fora do cache.
+          limites: servicoLimites.anotar(trajeto.geometria.coordinates),
           paradas: rota.paradas.map(({id, tipo, destinatario, endereco, status, latitude, longitude}) => ({
             id,
             tipo,
@@ -408,6 +456,122 @@ function criarServidor({
             latitude,
             longitude,
           })),
+        });
+        return;
+      }
+
+      // US03.04 — o motorista compartilha a posição enquanto a rota está em andamento. Guarda só a última leitura.
+      if (url.pathname === '/api/localizacao' && requisicao.method === 'PUT') {
+        const usuario = exigirUsuario(requisicao, ['motorista']);
+        const {erro: erroPosicao, posicao} = validarPosicaoCompartilhada(await lerJson(requisicao), agora());
+        if (erroPosicao) {
+          throw erroHttp(400, erroPosicao);
+        }
+        const rotaAtual = repositorio.buscarRotaAtual(usuario.id);
+        if (!rotaAtual || rotaAtual.status !== 'Em andamento') {
+          throw erroHttp(409, 'Não há rota em andamento: a posição não é compartilhada.');
+        }
+        repositorio.registrarPosicao(
+          usuario.id,
+          {...posicao, rotaId: rotaAtual.id, recebidaEm: agora()},
+          RETENCAO_DA_POSICAO_MS,
+        );
+        responder(resposta, 204, {});
+        return;
+      }
+
+      if (url.pathname === '/api/localizacao' && requisicao.method === 'DELETE') {
+        const usuario = exigirUsuario(requisicao, ['motorista']);
+        repositorio.removerPosicao(usuario.id);
+        responder(resposta, 204, {});
+        return;
+      }
+
+      // Só o gestor vê a frota (posição e andamento das tarefas dos motoristas).
+      if (url.pathname === '/api/frota' && requisicao.method === 'GET') {
+        exigirUsuario(requisicao, ['gestor']);
+        const geradoEm = agora();
+        responder(resposta, 200, {
+          geradoEm,
+          motoristas: repositorio.listarFrota(geradoEm, RETENCAO_DA_POSICAO_MS),
+        });
+        return;
+      }
+
+      const recalculoEncontrado = url.pathname.match(/^\/api\/rotas\/([^/]+)\/recalcular$/);
+
+      // US05.04: novo trajeto a partir da posição atual do motorista até as paradas que faltam.
+      // A posição vem só no corpo desta chamada, é usada apenas como ponto de partida do cálculo e
+      // NÃO é guardada nem registrada. O resultado também não vai para o cache de trajetos (depende da posição).
+      if (requisicao.method === 'POST' && recalculoEncontrado) {
+        const usuario = exigirUsuario(requisicao, ['motorista']);
+        const rota = repositorio.buscarRota(decodeURIComponent(recalculoEncontrado[1]));
+        if (!rota) {
+          throw erroHttp(404, 'Rota não encontrada.');
+        }
+        if (rota.motoristaId !== usuario.id) {
+          throw erroHttp(403, 'Motorista só pode recalcular a própria rota.');
+        }
+        const corpo = await lerJson(requisicao);
+        if (!posicaoValida(corpo)) {
+          throw erroHttp(400, 'Informe a posição atual (latitude e longitude válidas).');
+        }
+
+        const restantes = rota.paradas.filter(parada => !STATUS_PARADA_ENCERRADA.has(parada.status));
+        if (restantes.length === 0) {
+          throw erroHttp(409, 'Não há paradas restantes para recalcular.');
+        }
+        const semLocalizacao = restantes.filter(parada => !temLocalizacao(parada));
+        if (semLocalizacao.length > 0) {
+          const nomes = semLocalizacao.map(parada => `"${parada.destinatario}"`).join(', ');
+          throw erroHttp(422, `Paradas sem localização no mapa: ${nomes}.`);
+        }
+
+        const origem = {latitude: corpo.latitude, longitude: corpo.longitude, rotulo: 'Sua posição'};
+        const pontos = [
+          origem,
+          ...restantes.map(parada => ({
+            latitude: parada.latitude,
+            longitude: parada.longitude,
+            rotulo: parada.destinatario,
+          })),
+        ];
+        const trajeto = await servicoRoteamento.calcularTrajeto(pontos);
+        const numeroOriginal = new Map(rota.paradas.map((parada, indice) => [parada.id, indice + 1]));
+
+        responder(resposta, 200, {
+          rotaId: rota.id,
+          recalculado: true,
+          geometria: trajeto.geometria,
+          distanciaM: trajeto.distanciaM,
+          duracaoS: trajeto.duracaoS,
+          calculadoEm: Date.now(),
+          manobras: trajeto.manobras ?? [],
+          limites: servicoLimites.anotar(trajeto.geometria.coordinates),
+          // A primeira "parada" é a posição de partida (já concluída para a previsão); as demais mantêm o número da rota.
+          paradas: [
+            {
+              id: 'origem-recalculo',
+              tipo: 'Coleta',
+              destinatario: 'Sua posição',
+              endereco: '',
+              status: 'Concluída',
+              latitude: origem.latitude,
+              longitude: origem.longitude,
+              origem: true,
+              numero: 0,
+            },
+            ...restantes.map(({id, tipo, destinatario, endereco, status, latitude, longitude}) => ({
+              id,
+              tipo,
+              destinatario,
+              endereco,
+              status,
+              latitude,
+              longitude,
+              numero: numeroOriginal.get(id),
+            })),
+          ],
         });
         return;
       }
@@ -511,6 +675,10 @@ if (require.main === module) {
       validadeToken: process.env.JWT_VALIDADE || '12h',
       seedDemo: process.env.ROTAMESTRE_SEED_DEMO === '1',
       urlOsrm: process.env.OSRM_URL || 'http://127.0.0.1:5000',
+      servicoLimites: carregarLimites(
+        process.env.LIMITES_VIA ||
+          path.join(__dirname, '..', '..', 'dev', 'mapas', 'dados', 'limites', 'limites.json'),
+      ),
     });
   } catch (falha) {
     process.stderr.write(`Não foi possível iniciar a API: ${falha.message}\n`);

@@ -1,13 +1,14 @@
 import React, {useEffect, useMemo, useState} from 'react';
 import {Pressable, ScrollView, Text, View} from 'react-native';
 import {MaterialDesignIcons} from '@react-native-vector-icons/material-design-icons';
+import {alertaDeAproximacao, InfoDeVelocidade} from './alertas';
 import {cores, estilos} from './estilos';
 import {formatarDistancia, formatarDuracao} from './mapa';
 import {criarPlano, GuiaDeNavegacao} from './navegacao';
 import {calcularPrevisoes, formatarHorario, PrevisaoDeParada} from './previsao';
 import {Trajeto} from './tipos';
 import {EstadoDaVoz} from './viewmodels/guiaDeNavegacao';
-import {NavegacaoViewModel, useGuiaDeNavegacao} from './viewmodels/NavegacaoViewModel';
+import {EstadoDoRecalculo, NavegacaoViewModel, useGuiaDeNavegacao} from './viewmodels/NavegacaoViewModel';
 
 type Tom = 'normal' | 'erro' | 'aviso' | 'sucesso';
 
@@ -32,12 +33,19 @@ type FaixaProps = {
   distancia?: string;
   apoio?: string;
   rotuloDeAcessibilidade: string;
+  /** Anuncia mudanças de texto no leitor de tela (estado do recálculo). */
+  viva?: boolean;
 };
 
-function Faixa({tom, icone, titulo, distancia, apoio, rotuloDeAcessibilidade}: FaixaProps) {
+function Faixa({tom, icone, titulo, distancia, apoio, rotuloDeAcessibilidade, viva}: FaixaProps) {
   const cor = COR_DO_TEXTO[tom];
   return (
-    <View accessible accessibilityRole="summary" accessibilityLabel={rotuloDeAcessibilidade} style={[estilos.navegacaoFaixa, ESTILO_DO_FUNDO[tom]]}>
+    <View
+      accessible
+      accessibilityRole="summary"
+      accessibilityLiveRegion={viva ? 'polite' : undefined}
+      accessibilityLabel={rotuloDeAcessibilidade}
+      style={[estilos.navegacaoFaixa, ESTILO_DO_FUNDO[tom]]}>
       <MaterialDesignIcons name={icone} size={48} color={cor} />
       <View style={estilos.flex}>
         {distancia ? <Text style={[estilos.navegacaoDistancia, {color: cor}]}>{distancia}</Text> : null}
@@ -52,10 +60,26 @@ type FaixaDaManobraProps = {
   guia: GuiaDeNavegacao | null;
   chegou: boolean;
   semLocalizacao: boolean;
+  /** Estado do recálculo (US05.04); omitido, vale como ocioso. */
+  recalculo?: EstadoDoRecalculo;
 };
 
+/** Texto de apoio da faixa "Você saiu da rota", conforme o recálculo. */
+export function apoioDoDesvio(recalculo: EstadoDoRecalculo = {tipo: 'ocioso'}): string {
+  switch (recalculo.tipo) {
+    case 'calculando':
+      return 'Recalculando o trajeto a partir da sua posição...';
+    case 'falhou':
+      return recalculo.semConexao ? recalculo.mensagem : `${recalculo.mensagem} Nova tentativa em instantes. Volte ao trajeto azul.`;
+    case 'indisponivel':
+      return 'Entre na conta para recalcular. Por enquanto, volte ao trajeto azul.';
+    default:
+      return 'Volte ao trajeto azul ou aguarde o novo trajeto.';
+  }
+}
+
 /** Instrução da manobra no topo da tela: ícone, distância e texto grandes, sempre com texto além da cor. */
-export function FaixaDaManobra({guia, chegou, semLocalizacao}: FaixaDaManobraProps) {
+export function FaixaDaManobra({guia, chegou, semLocalizacao, recalculo}: FaixaDaManobraProps) {
   if (semLocalizacao) {
     return (
       <Faixa
@@ -81,13 +105,15 @@ export function FaixaDaManobra({guia, chegou, semLocalizacao}: FaixaDaManobraPro
     return <Faixa tom="sucesso" icone="flag-checkered" titulo={guia.manobra.texto} rotuloDeAcessibilidade={guia.manobra.texto} />;
   }
   if (guia.foraDaRota) {
+    const apoio = apoioDoDesvio(recalculo);
     return (
       <Faixa
         tom="erro"
-        icone="alert-circle-outline"
+        icone={recalculo?.tipo === 'calculando' ? 'map-marker-path' : 'alert-circle-outline'}
         titulo="Você saiu da rota"
-        apoio="O recálculo ainda não está disponível. Volte ao trajeto azul."
-        rotuloDeAcessibilidade="Você saiu da rota. O recálculo ainda não está disponível. Volte ao trajeto azul."
+        apoio={apoio}
+        viva
+        rotuloDeAcessibilidade={`Você saiu da rota. ${apoio}`}
       />
     );
   }
@@ -104,6 +130,96 @@ export function FaixaDaManobra({guia, chegou, semLocalizacao}: FaixaDaManobraPro
       apoio={guia.seguinte ? `Depois: ${guia.seguinte.texto}` : undefined}
       rotuloDeAcessibilidade={`Em ${distancia}: ${guia.manobra.texto}`}
     />
+  );
+}
+
+/**
+ * Velocidade e limite validado. Excesso: faixa vermelha com ícone e texto. Sem limite validado: avisa que
+ * ele está indisponível (nenhum valor estimado é mostrado como limite).
+ */
+export function FaixaDeVelocidade({velocidade}: {velocidade: InfoDeVelocidade}) {
+  const {kmh, limiteKmh, excesso} = velocidade;
+  const atual = kmh === null ? null : Math.round(kmh);
+  if (limiteKmh === null) {
+    return (
+      <View
+        accessible
+        accessibilityLabel="Limite de velocidade indisponível neste trecho"
+        style={estilos.alertaLinha}>
+        <MaterialDesignIcons name="speedometer-slow" size={24} color={cores.textoApoio} />
+        <Text style={[estilos.alertaTextoApoio, estilos.flex]}>Limite de velocidade indisponível neste trecho</Text>
+      </View>
+    );
+  }
+  if (excesso) {
+    const texto = `Acima do limite: ${atual ?? '--'} km/h (limite ${limiteKmh})`;
+    return (
+      <View
+        accessible
+        accessibilityRole="alert"
+        accessibilityLiveRegion="assertive"
+        // O rótulo não leva a velocidade (muda a cada segundo): com ela, o leitor de tela repetiria o aviso a cada leitura.
+        accessibilityLabel={`Atenção, velocidade acima do limite de ${limiteKmh} quilômetros por hora.`}
+        style={[estilos.alertaLinha, estilos.alertaLinhaErro]}>
+        <MaterialDesignIcons name="speedometer" size={24} color={cores.erro} />
+        <Text style={[estilos.alertaTexto, estilos.flex, {color: cores.erro}]}>{texto}</Text>
+      </View>
+    );
+  }
+  return (
+    <View
+      accessible
+      accessibilityLabel={`Limite de velocidade ${limiteKmh} quilômetros por hora${atual === null ? '' : `, você está a ${atual}`}`}
+      style={estilos.alertaLinha}>
+      <MaterialDesignIcons name="speedometer-medium" size={24} color={cores.textoApoio} />
+      <Text style={[estilos.alertaTexto, estilos.flex]}>
+        {atual === null ? '' : `${atual} km/h • `}Limite {limiteKmh} km/h
+      </Text>
+    </View>
+  );
+}
+
+/** Aviso visual de aproximação da parada (300 m e menos). */
+export function FaixaDeAproximacao({guia}: {guia: GuiaDeNavegacao | null}) {
+  const alerta = alertaDeAproximacao(guia);
+  if (!alerta) {
+    return null;
+  }
+  const texto = `${alerta.titulo} • ${formatarDistancia(alerta.distanciaM)}`;
+  return (
+    <View
+      accessible
+      accessibilityRole="alert"
+      accessibilityLabel={texto}
+      style={[estilos.alertaLinha, estilos.alertaLinhaAviso]}>
+      <MaterialDesignIcons name="map-marker-radius" size={24} color={cores.acentoTexto} />
+      <Text style={[estilos.alertaTexto, estilos.flex, {color: cores.acentoTexto}]}>{texto}</Text>
+    </View>
+  );
+}
+
+type AlertasProps = {guia: GuiaDeNavegacao | null; semLocalizacao: boolean; recalculo?: EstadoDoRecalculo};
+
+/** Alertas de navegação (US05.05) abaixo da instrução da manobra. */
+export function AlertasDaNavegacao({guia, semLocalizacao, recalculo}: AlertasProps) {
+  if (semLocalizacao || !guia || guia.chegou) {
+    return null;
+  }
+  return (
+    <>
+      {recalculo?.tipo === 'recalculado' ? (
+        <View
+          accessible
+          accessibilityRole="alert"
+          accessibilityLabel="Trajeto recalculado a partir da sua posição"
+          style={[estilos.alertaLinha, estilos.alertaLinhaSucesso]}>
+          <MaterialDesignIcons name="check-circle-outline" size={24} color={cores.sucesso} />
+          <Text style={[estilos.alertaTexto, estilos.flex, {color: cores.sucesso}]}>Trajeto recalculado a partir da sua posição</Text>
+        </View>
+      ) : null}
+      <FaixaDeAproximacao guia={guia} />
+      {guia.foraDaRota ? null : <FaixaDeVelocidade velocidade={guia.velocidade} />}
+    </>
   );
 }
 
@@ -177,7 +293,19 @@ export function PainelDeNavegacao({guia, voz, aoAlternarVoz, aoEncerrar, aoInsta
 /** Faixa ligada ao ViewModel: é ela (e não a tela do mapa) que renderiza a cada leitura. */
 export function FaixaDaManobraConectada({navegacao}: {navegacao: NavegacaoViewModel}) {
   const guia = useGuiaDeNavegacao(navegacao);
-  return <FaixaDaManobra guia={guia} chegou={navegacao.estado.tipo === 'chegou'} semLocalizacao={navegacao.semLocalizacao} />;
+  return (
+    <FaixaDaManobra
+      guia={guia}
+      chegou={navegacao.estado.tipo === 'chegou'}
+      semLocalizacao={navegacao.semLocalizacao}
+      recalculo={navegacao.recalculo}
+    />
+  );
+}
+
+export function AlertasDaNavegacaoConectados({navegacao}: {navegacao: NavegacaoViewModel}) {
+  const guia = useGuiaDeNavegacao(navegacao);
+  return <AlertasDaNavegacao guia={guia} semLocalizacao={navegacao.semLocalizacao} recalculo={navegacao.recalculo} />;
 }
 
 export function PainelDeNavegacaoConectado({navegacao}: {navegacao: NavegacaoViewModel}) {

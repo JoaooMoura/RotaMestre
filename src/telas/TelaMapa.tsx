@@ -3,7 +3,12 @@ import {ActivityIndicator, Text, View} from 'react-native';
 import {Camera, CameraRef, GeoJSONSource, Layer, Map, Marker} from '@maplibre/maplibre-react-native';
 import {MaterialDesignIcons} from '@react-native-vector-icons/material-design-icons';
 import {Botao, BotaoPrincipal, Cabecalho} from '../componentes';
-import {FaixaDaManobraConectada, PainelDeNavegacaoConectado, PrevisaoDeChegadaConectada} from '../componentesNavegacao';
+import {
+  AlertasDaNavegacaoConectados,
+  FaixaDaManobraConectada,
+  PainelDeNavegacaoConectado,
+  PrevisaoDeChegadaConectada,
+} from '../componentesNavegacao';
 import {IndicadorLocalizacaoConectado} from '../componentesLocalizacao';
 import {AvisoSemConexaoConectado} from '../componentesOffline';
 import {URL_ESTILO_MAPA} from '../configuracao';
@@ -68,9 +73,13 @@ export function TelaMapa({rota, onVoltar}: Props) {
   );
 }
 
-function MapaDoTrajeto({trajeto}: {trajeto: Trajeto}) {
+function MapaDoTrajeto({trajeto: trajetoOriginal}: {trajeto: Trajeto}) {
+  const offline = useOffline();
   const [selecionadaId, setSelecionadaId] = useState<string | null>(null);
   const [mapaFalhou, setMapaFalhou] = useState(false);
+  // Sem sessão não há como pedir um novo trajeto ao servidor (US05.04). Depois de um recálculo, `trajeto` é o novo.
+  const navegacao = useNavegacaoViewModel(trajetoOriginal, undefined, {recalculoDisponivel: !offline.semSessao});
+  const trajeto = navegacao.trajeto;
   // Objetos estáveis: sem isso, cada toque numa parada reenviaria a geometria ao mapa nativo.
   const dadosDoTrajeto = useMemo(
     () => ({type: 'Feature' as const, properties: {}, geometry: trajeto.geometria}),
@@ -87,7 +96,6 @@ function MapaDoTrajeto({trajeto}: {trajeto: Trajeto}) {
     [trajeto.paradas],
   );
   const selecionada = trajeto.paradas.find(parada => parada.id === selecionadaId);
-  const navegacao = useNavegacaoViewModel(trajeto);
   const posicaoStore = useStoreDaPosicao();
   const cameraRef = useRef<CameraRef>(null);
   const navegando = navegacao.estado.tipo !== 'inativa';
@@ -146,7 +154,8 @@ function MapaDoTrajeto({trajeto}: {trajeto: Trajeto}) {
         <GeoJSONSource id="trajeto" data={dadosDoTrajeto}>
           <Layer id="trajeto-linha" type="line" layout={LAYOUT_LINHA} paint={PAINT_LINHA} />
         </GeoJSONSource>
-        {trajeto.paradas.map((parada, indice) => (
+        {trajeto.paradas.map((parada, indice) =>
+          parada.origem ? null : (
           <Marker
             key={parada.id}
             id={`parada-${parada.id}`}
@@ -155,21 +164,22 @@ function MapaDoTrajeto({trajeto}: {trajeto: Trajeto}) {
             <View
               accessible
               accessibilityRole="button"
-              accessibilityLabel={`Parada ${indice + 1}: ${parada.destinatario}, ${parada.status}`}
+              accessibilityLabel={`Parada ${parada.numero ?? indice + 1}: ${parada.destinatario}, ${parada.status}`}
               style={[
                 estilos.mapaMarcador,
                 parada.status === 'Concluída' && estilos.mapaMarcadorConcluida,
                 parada.id === selecionadaId && estilos.mapaMarcadorSelecionado,
               ]}>
               <View style={estilos.mapaMarcadorConteudo}>
-                <Text style={estilos.mapaMarcadorTexto}>{indice + 1}</Text>
+                <Text style={estilos.mapaMarcadorTexto}>{parada.numero ?? indice + 1}</Text>
                 {parada.status === 'Concluída' ? (
                   <MaterialDesignIcons name="check-bold" size={16} color="#FFFFFF" />
                 ) : null}
               </View>
             </View>
           </Marker>
-        ))}
+          ),
+        )}
         <MarcadorDoVeiculo />
       </Map>
 
@@ -183,7 +193,10 @@ function MapaDoTrajeto({trajeto}: {trajeto: Trajeto}) {
             </View>
           ) : null}
           {navegando ? (
-            <FaixaDaManobraConectada navegacao={navegacao} />
+            <>
+              <FaixaDaManobraConectada navegacao={navegacao} />
+              <AlertasDaNavegacaoConectados navegacao={navegacao} />
+            </>
           ) : null}
         </View>
       ) : null}

@@ -20,9 +20,10 @@ import {
 import {cores, estilos} from '../estilos';
 import {primeiroNome} from '../nomes';
 import {Motorista, Parada, Rota, TipoParada, Usuario} from '../tipos';
+import {TelaFrota} from './TelaFrota';
 
 type Aba = 'Início' | 'Rotas' | 'Motoristas' | 'Perfil';
-type Fluxo = 'base' | 'criar' | 'organizar' | 'atribuir' | 'detalhe' | 'reatribuir';
+type Fluxo = 'base' | 'criar' | 'organizar' | 'atribuir' | 'detalhe' | 'reatribuir' | 'frota';
 
 const ITENS_NAVEGACAO: ItemNavegacao[] = [
   {nome: 'Início', icone: 'view-dashboard-outline', iconeAtivo: 'view-dashboard'},
@@ -463,6 +464,9 @@ export function TelaGestorSprint({
             apoio={`${motoristas.length} ${motoristas.length === 1 ? 'cadastrado' : 'cadastrados'}`}
           />
         }>
+        <View style={estilos.frotaBotao}>
+          <BotaoContornado titulo="Ver frota no mapa" icone="map-marker-multiple-outline" onPress={() => setFluxo('frota')} />
+        </View>
         <Text style={estilos.secaoRotulo}>Equipe</Text>
         {motoristas.map(motorista => {
           const situacao = situacaoMotorista(motorista);
@@ -495,6 +499,14 @@ export function TelaGestorSprint({
       return <PerfilUsuario usuario={usuario} onSair={onSair} />;
     }
     return conteudoInicio();
+  }
+
+  if (fluxo === 'frota') {
+    return (
+      <TransicaoEntrada key="frota">
+        <TelaFrota onVoltar={() => setFluxo('base')} />
+      </TransicaoEntrada>
+    );
   }
 
   if (FLUXOS_TELA_CHEIA.includes(fluxo)) {

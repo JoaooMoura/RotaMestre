@@ -1,5 +1,5 @@
 import {API_URL} from '../configuracao';
-import {Motorista, NovoMotorista, Rota, Sessao, Trajeto} from '../tipos';
+import {Frota, Motorista, NovoMotorista, Rota, Sessao, Trajeto} from '../tipos';
 
 export const SEM_CONEXAO = 0;
 
@@ -19,6 +19,28 @@ let aoExpirar: (() => void) | null = null;
 
 export function definirToken(token: string | null) {
   tokenAtual = token;
+}
+
+export function tokenEmUso() {
+  return tokenAtual;
+}
+
+/**
+ * Executa com o token dado (tarefa em segundo plano, sem tela). Se já há uma sessão aberta no app, ela é mantida e
+ * usada: o token da tarefa nunca substitui o da tela, e só é removido se foi a tarefa quem o colocou.
+ */
+export async function comToken<T>(token: string, tarefa: () => Promise<T>): Promise<T> {
+  if (tokenAtual !== null) {
+    return tarefa();
+  }
+  tokenAtual = token;
+  try {
+    return await tarefa();
+  } finally {
+    if (tokenAtual === token) {
+      tokenAtual = null;
+    }
+  }
 }
 
 export function aoExpirarSessao(callback: () => void) {
@@ -95,6 +117,37 @@ export async function buscarRotaAtual(motoristaId?: string): Promise<Rota | null
 
 export function obterTrajeto(rotaId: string) {
   return requisicao<Trajeto>(`/rotas/${encodeURIComponent(rotaId)}/trajeto`);
+}
+
+/** Compartilha a posição atual com o gestor (o servidor guarda só a última). */
+export function compartilharPosicao(posicao: {latitude: number; longitude: number; precisaoM: number | null; registradaEm: number}) {
+  return requisicao<void>('/localizacao', {
+    method: 'PUT',
+    body: JSON.stringify({
+      latitude: posicao.latitude,
+      longitude: posicao.longitude,
+      precisaoM: posicao.precisaoM,
+      registradaEm: posicao.registradaEm,
+    }),
+  });
+}
+
+/** Deixa de compartilhar: o servidor apaga a última posição. */
+export function pararDeCompartilharPosicao() {
+  return requisicao<void>('/localizacao', {method: 'DELETE'});
+}
+
+/** Só o gestor: motoristas com rota em andamento, posição e andamento das paradas. */
+export function buscarFrota() {
+  return requisicao<Frota>('/frota');
+}
+
+/** Pede um novo trajeto da posição atual até as paradas que faltam. A posição só vai nesta chamada. */
+export function recalcularTrajeto(rotaId: string, posicao: {latitude: number; longitude: number}) {
+  return requisicao<Trajeto>(`/rotas/${encodeURIComponent(rotaId)}/recalcular`, {
+    method: 'POST',
+    body: JSON.stringify({latitude: posicao.latitude, longitude: posicao.longitude}),
+  });
 }
 
 export function salvarRota(rota: Rota) {

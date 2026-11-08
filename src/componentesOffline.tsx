@@ -4,7 +4,9 @@ import {MaterialDesignIcons} from '@react-native-vector-icons/material-design-ic
 import {BotaoContornado, BotaoPrincipal} from './componentes';
 import {cores, estilos} from './estilos';
 import {formatarDataEHora, MENSAGEM_ENTRAR_PARA_COLETAR, PacoteOffline, Pendencia} from './offline';
+import {descreverAtualizacao, EstadoDaAtualizacao} from './atualizacao';
 import {textoDoMotivo} from './sincronizacao';
+import {useAtualizacao} from './viewmodels/AtualizacaoViewModel';
 import {Confirmacao, EstadoDoDownload, EstadoDoEnvio, SituacaoDoPacote, useOffline} from './viewmodels/OfflineViewModel';
 
 type Props = {
@@ -234,4 +236,58 @@ export function PainelDeEnviosConectado() {
       aoDispensar={offline.dispensarConfirmacao}
     />
   );
+}
+
+type AvisoDeAtualizacaoProps = {
+  estado: EstadoDaAtualizacao | null;
+  atualizando: boolean;
+  aoAtualizar: () => void;
+};
+
+/** Situação da atualização da programação em segundo plano (US06.05), sempre em texto. */
+export function AvisoDeAtualizacao({estado, atualizando, aoAtualizar}: AvisoDeAtualizacaoProps) {
+  const descricao = descreverAtualizacao(estado);
+  if (!estado && !atualizando) {
+    return null;
+  }
+  return (
+    <View style={estilos.cartaoOffline}>
+      {estado?.novaRota ? (
+        <View style={estilos.localizacaoLinha} accessibilityRole="alert">
+          <MaterialDesignIcons name="map-marker-plus-outline" size={24} color={cores.acentoTexto} />
+          <Text style={[estilos.textoApoio, estilos.flex, {color: cores.acentoTexto}]}>
+            Há uma nova rota para você: {estado.novaRota.nome}. Abra a rota e baixe de novo para usá-la sem internet.
+          </Text>
+        </View>
+      ) : null}
+      {estado?.trajetoDesatualizado ? (
+        <View style={estilos.localizacaoLinha} accessibilityRole="alert">
+          <MaterialDesignIcons name="alert-circle-outline" size={24} color={cores.acentoTexto} />
+          <Text style={[estilos.textoApoio, estilos.flex, {color: cores.acentoTexto}]}>
+            As paradas mudaram, mas o trajeto no mapa ainda não foi atualizado. Conecte-se e abra o mapa.
+          </Text>
+        </View>
+      ) : null}
+      <View style={estilos.localizacaoLinha}>
+        <MaterialDesignIcons name={atualizando ? 'sync' : 'update'} size={24} color={cores.textoApoio} />
+        <Text style={[estilos.textoApoio, estilos.flex]} accessibilityLiveRegion="polite">
+          {atualizando ? 'Atualizando a programação...' : descricao ?? 'Programação ainda não atualizada em segundo plano.'}
+        </Text>
+      </View>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Atualizar programação agora"
+        accessibilityState={{disabled: atualizando}}
+        disabled={atualizando}
+        style={estilos.localizacaoAcao}
+        onPress={aoAtualizar}>
+        <Text style={estilos.localizacaoAcaoTexto}>Atualizar agora</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+export function AvisoDeAtualizacaoConectado() {
+  const {estado, atualizando, atualizarAgora} = useAtualizacao();
+  return <AvisoDeAtualizacao estado={estado} atualizando={atualizando} aoAtualizar={() => atualizarAgora()} />;
 }
