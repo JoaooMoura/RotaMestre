@@ -179,6 +179,40 @@ export function FaixaDeVelocidade({velocidade}: {velocidade: InfoDeVelocidade}) 
   );
 }
 
+/**
+ * Chip pequeno com velocidade e limite, para ficar sobre o mapa mesmo com o painel fechado
+ * (ex.: "62 km/h • Limite 60"). Em excesso fica vermelho, com ícone e texto, e é anunciado como alerta.
+ */
+export function ChipDeVelocidade({velocidade}: {velocidade: InfoDeVelocidade}) {
+  const {kmh, limiteKmh, excesso} = velocidade;
+  const atual = kmh === null ? null : Math.round(kmh);
+  const velocidadeTexto = atual === null ? '-- km/h' : `${atual} km/h`;
+  const texto = limiteKmh === null ? `${velocidadeTexto} • Sem limite` : `${velocidadeTexto} • Limite ${limiteKmh}`;
+  const emExcesso = excesso && limiteKmh !== null;
+  return (
+    <View
+      accessible
+      accessibilityRole={emExcesso ? 'alert' : undefined}
+      accessibilityLiveRegion={emExcesso ? 'assertive' : undefined}
+      // Sem a velocidade no rótulo do excesso: ela muda a cada leitura e o leitor de tela repetiria o aviso.
+      accessibilityLabel={
+        emExcesso
+          ? `Atenção, velocidade acima do limite de ${limiteKmh} quilômetros por hora.`
+          : limiteKmh === null
+            ? `Velocidade ${atual ?? 'indisponível'}. Limite de velocidade indisponível neste trecho`
+            : `Limite de velocidade ${limiteKmh} quilômetros por hora${atual === null ? '' : `, você está a ${atual}`}`
+      }
+      style={[estilos.mapaChip, emExcesso && estilos.mapaChipExcesso]}>
+      <MaterialDesignIcons
+        name={emExcesso ? 'speedometer' : limiteKmh === null ? 'speedometer-slow' : 'speedometer-medium'}
+        size={20}
+        color={emExcesso ? cores.erro : cores.textoApoio}
+      />
+      <Text style={[estilos.mapaChipTexto, emExcesso && {color: cores.erro}]}>{texto}</Text>
+    </View>
+  );
+}
+
 /** Aviso visual de aproximação da parada (300 m e menos). */
 export function FaixaDeAproximacao({guia}: {guia: GuiaDeNavegacao | null}) {
   const alerta = alertaDeAproximacao(guia);
@@ -319,13 +353,13 @@ export function AlertasDaNavegacaoConectados({navegacao}: {navegacao: NavegacaoV
   return <AlertasDaNavegacao guia={guia} semLocalizacao={navegacao.semLocalizacao} recalculo={navegacao.recalculo} semVelocidade />;
 }
 
-/** Velocidade e limite no painel de baixo; some quando a faixa de cima já explica a situação (sem GPS, fora da rota, chegada). */
-export function VelocidadeDaNavegacaoConectada({navegacao}: {navegacao: NavegacaoViewModel}) {
+/** Chip de velocidade e limite sobre o mapa; some quando a faixa de cima já explica a situação (sem GPS, fora da rota, chegada). */
+export function ChipDeVelocidadeConectado({navegacao}: {navegacao: NavegacaoViewModel}) {
   const guia = useGuiaDeNavegacao(navegacao);
   if (navegacao.semLocalizacao || !guia || guia.chegou || guia.foraDaRota) {
     return null;
   }
-  return <FaixaDeVelocidade velocidade={guia.velocidade} />;
+  return <ChipDeVelocidade velocidade={guia.velocidade} />;
 }
 
 export function PainelDeNavegacaoConectado({navegacao, children}: {navegacao: NavegacaoViewModel; children?: React.ReactNode}) {

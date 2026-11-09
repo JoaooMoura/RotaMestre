@@ -1,5 +1,5 @@
 import React, {useEffect, useMemo, useRef, useState} from 'react';
-import {ActivityIndicator, Text, View} from 'react-native';
+import {ActivityIndicator, Pressable, ScrollView, Text, useWindowDimensions, View} from 'react-native';
 import {Camera, CameraRef, GeoJSONSource, Layer, Map, Marker} from '@maplibre/maplibre-react-native';
 import {MaterialDesignIcons} from '@react-native-vector-icons/material-design-icons';
 import {Botao, BotaoPrincipal, Cabecalho} from '../componentes';
@@ -8,7 +8,7 @@ import {
   FaixaDaManobraConectada,
   PainelDeNavegacaoConectado,
   PrevisaoDeChegadaConectada,
-  VelocidadeDaNavegacaoConectada,
+  ChipDeVelocidadeConectado,
 } from '../componentesNavegacao';
 import {IndicadorLocalizacaoConectado, ResumoDeAvisosConectado} from '../componentesLocalizacao';
 import {AvisoSemConexaoConectado} from '../componentesOffline';
@@ -22,7 +22,8 @@ import {useNavegacaoViewModel} from '../viewmodels/NavegacaoViewModel';
 import {useOffline} from '../viewmodels/OfflineViewModel';
 import {PainelSimuladorGps} from './PainelSimuladorGps';
 
-const PREENCHIMENTO_DO_TRAJETO = {top: 64, right: 48, bottom: 260, left: 48};
+// O painel aberto ocupa no máximo esta fração da altura; o enquadramento do trajeto deixa esse espaço livre.
+const FRACAO_MAXIMA_DO_PAINEL = 0.4;
 const POSICAO_ATRIBUICAO = {top: 8, right: 8};
 const POSICAO_LOGO = {top: 8, left: 8};
 // A bússola (aparece quando o mapa gira) fica ao lado da atribuição, nunca por cima dela.
@@ -86,11 +87,19 @@ function MapaDoTrajeto({trajeto: trajetoOriginal}: {trajeto: Trajeto}) {
     () => ({type: 'Feature' as const, properties: {}, geometry: trajeto.geometria}),
     [trajeto.geometria],
   );
+  const {height: alturaDaTela} = useWindowDimensions();
+  const alturaMaximaDoPainel = Math.round(alturaDaTela * FRACAO_MAXIMA_DO_PAINEL);
+  // Só o padding muda com o painel: o mapa ocupa a tela toda e o trajeto é enquadrado acima do painel.
+  const preenchimentoDoTrajeto = useMemo(
+    () => ({top: 64, right: 48, bottom: alturaMaximaDoPainel, left: 48}),
+    [alturaMaximaDoPainel],
+  );
   const visaoInicial = useMemo(() => {
     const limites = limitesDasCoordenadas(trajeto.geometria.coordinates);
     return limites
-      ? {bounds: limites, padding: PREENCHIMENTO_DO_TRAJETO}
+      ? {bounds: limites, padding: preenchimentoDoTrajeto}
       : {center: [trajeto.paradas[0].longitude, trajeto.paradas[0].latitude] as Coordenada, zoom: 12};
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [trajeto.geometria, trajeto.paradas]);
   const posicoes = useMemo(
     () => trajeto.paradas.map(parada => [parada.longitude, parada.latitude] as Coordenada),
@@ -101,6 +110,15 @@ function MapaDoTrajeto({trajeto: trajetoOriginal}: {trajeto: Trajeto}) {
   const cameraRef = useRef<CameraRef>(null);
   const navegando = navegacao.estado.tipo !== 'inativa';
   const seguindo = navegacao.estado.tipo === 'navegando';
+  // Painel: aberto fora da navegação, fechado durante ela (o mapa fica livre). Ao iniciar fecha; ao encerrar abre.
+  const [painelAberto, setPainelAberto] = useState(!navegando);
+  const navegandoAntes = useRef(navegando);
+  useEffect(() => {
+    if (navegandoAntes.current !== navegando) {
+      navegandoAntes.current = navegando;
+      setPainelAberto(!navegando);
+    }
+  }, [navegando]);
 
   // Durante a navegação a câmera acompanha o veículo (no máximo a cada 1,5 s, para não pesar na tela).
   useEffect(() => {
@@ -131,11 +149,11 @@ function MapaDoTrajeto({trajeto: trajetoOriginal}: {trajeto: Trajeto}) {
     if (estavaNavegando.current && !navegando) {
       const limites = limitesDasCoordenadas(trajeto.geometria.coordinates);
       if (limites) {
-        cameraRef.current?.fitBounds(limites, {padding: PREENCHIMENTO_DO_TRAJETO, bearing: 0, duration: 800});
+        cameraRef.current?.fitBounds(limites, {padding: preenchimentoDoTrajeto, bearing: 0, duration: 800});
       }
     }
     estavaNavegando.current = navegando;
-  }, [navegando, trajeto.geometria]);
+  }, [navegando, trajeto.geometria, preenchimentoDoTrajeto]);
   const rotaSimulada = useMemo(
     () => trajeto.geometria.coordinates.map(([longitude, latitude]) => ({latitude, longitude})),
     [trajeto.geometria],
@@ -202,44 +220,74 @@ function MapaDoTrajeto({trajeto: trajetoOriginal}: {trajeto: Trajeto}) {
         </View>
       ) : null}
 
-      <View style={estilos.mapaPainel}>
-        <AvisoSemConexaoConectado />
-        {navegando ? (
-          <>
-            <VelocidadeDaNavegacaoConectada navegacao={navegacao} />
-            <PainelDeNavegacaoConectado navegacao={navegacao}>
-              <PrevisaoDeChegadaConectada trajeto={trajeto} navegacao={navegacao} compacta />
-              <ResumoDeAvisosConectado />
-            </PainelDeNavegacaoConectado>
-          </>
-        ) : (
-          <>
-            <IndicadorLocalizacaoConectado />
-            {selecionada ? (
-              <>
-                <Text style={estilos.mapaPainelTitulo}>{selecionada.destinatario}</Text>
-                <Text style={estilos.textoApoio}>{selecionada.endereco}</Text>
-                <Text style={estilos.textoApoio}>
-                  {selecionada.tipo} • {selecionada.status}
-                </Text>
-              </>
-            ) : (
-              <>
-                <Text style={estilos.mapaPainelTitulo}>
-                  {trajeto.paradas.length} paradas • {formatarDistancia(trajeto.distanciaM)} •{' '}
-                  {formatarDuracao(trajeto.duracaoS)}
-                </Text>
-                <Text style={estilos.textoApoio}>
-                  Estimativa pela distância das vias, sem trânsito. Toque em uma parada para ver os detalhes.
-                </Text>
-              </>
+      <View style={estilos.mapaRodape}>
+        <View style={estilos.mapaRodapeLinha}>
+          {navegando ? <ChipDeVelocidadeConectado navegacao={navegacao} /> : <View />}
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={painelAberto ? 'Fechar painel da rota' : 'Abrir painel da rota'}
+            accessibilityState={{expanded: painelAberto}}
+            onPress={() => setPainelAberto(aberto => !aberto)}
+            style={({pressed}) => [estilos.mapaFab, pressed && estilos.mapaFabPressionado]}>
+            <MaterialDesignIcons name={painelAberto ? 'close' : 'menu'} size={28} color="#FFFFFF" />
+          </Pressable>
+        </View>
+
+        {painelAberto ? (
+          <View style={[estilos.mapaPainelFolha, {maxHeight: alturaMaximaDoPainel}]}>
+            <View style={estilos.mapaPainelCabecalho}>
+              <Text style={estilos.mapaPainelTitulo}>Painel da rota</Text>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Fechar painel"
+                style={estilos.mapaPainelFechar}
+                onPress={() => setPainelAberto(false)}>
+                <MaterialDesignIcons name="close" size={24} color={cores.textoApoio} />
+              </Pressable>
+            </View>
+            <ScrollView contentContainerStyle={estilos.mapaPainelConteudo} nestedScrollEnabled>
+              <AvisoSemConexaoConectado />
+              {navegando ? (
+                <PainelDeNavegacaoConectado navegacao={navegacao}>
+                  <PrevisaoDeChegadaConectada trajeto={trajeto} navegacao={navegacao} compacta />
+                  <ResumoDeAvisosConectado />
+                </PainelDeNavegacaoConectado>
+              ) : (
+                <>
+                  <IndicadorLocalizacaoConectado />
+                  {selecionada ? (
+                    <>
+                      <Text style={estilos.mapaPainelTitulo}>{selecionada.destinatario}</Text>
+                      <Text style={estilos.textoApoio}>{selecionada.endereco}</Text>
+                      <Text style={estilos.textoApoio}>
+                        {selecionada.tipo} • {selecionada.status}
+                      </Text>
+                    </>
+                  ) : (
+                    <>
+                      <Text style={estilos.mapaPainelTitulo}>
+                        {trajeto.paradas.length} paradas • {formatarDistancia(trajeto.distanciaM)} •{' '}
+                        {formatarDuracao(trajeto.duracaoS)}
+                      </Text>
+                      <Text style={estilos.textoApoio}>
+                        Estimativa pela distância das vias, sem trânsito. Toque em uma parada para ver os detalhes.
+                      </Text>
+                    </>
+                  )}
+                  <PrevisaoDeChegadaConectada trajeto={trajeto} navegacao={navegacao} />
+                </>
+              )}
+              <PainelSimuladorGps rota={rotaSimulada} recolhivel={navegando} />
+            </ScrollView>
+            {navegando ? null : (
+              // A ação principal fica fixa embaixo da folha, sempre à vista, mesmo com o conteúdo rolando.
+              <View style={estilos.mapaPainelRodapeFixo}>
+                <BotaoPrincipal titulo="Iniciar navegação" desabilitado={!navegacao.podeIniciar} onPress={navegacao.iniciar} />
+                {navegacao.motivoDeNaoPoderIniciar ? <Text style={estilos.textoApoio}>{navegacao.motivoDeNaoPoderIniciar}</Text> : null}
+              </View>
             )}
-            <PrevisaoDeChegadaConectada trajeto={trajeto} navegacao={navegacao} />
-            <BotaoPrincipal titulo="Iniciar navegação" desabilitado={!navegacao.podeIniciar} onPress={navegacao.iniciar} />
-            {navegacao.motivoDeNaoPoderIniciar ? <Text style={estilos.textoApoio}>{navegacao.motivoDeNaoPoderIniciar}</Text> : null}
-          </>
-        )}
-        <PainelSimuladorGps rota={rotaSimulada} recolhivel={navegando} />
+          </View>
+        ) : null}
       </View>
     </View>
   );
