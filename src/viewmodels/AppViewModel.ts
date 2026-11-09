@@ -47,7 +47,7 @@ export type AppViewModel = {
   atualizarEmSegundoPlano: boolean;
   recarregar: () => Promise<void>;
   /** Relê rota e motoristas do gestor sem trocar de tela nem avisar de falhas. */
-  atualizarSilenciosa: () => Promise<void>;
+  atualizarSilenciosa: (opcoes?: {aceitarSemRota?: boolean}) => Promise<void>;
   atualizarRota: (rota: Rota) => Promise<ResultadoSalvar>;
   abrirRotaBaixada: () => Promise<void>;
   sair: () => void;

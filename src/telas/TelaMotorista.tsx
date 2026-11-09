@@ -1,6 +1,7 @@
 import React, {useState} from 'react';
 import {
   Alert,
+  AppState,
   Image,
   Pressable,
   ScrollView,
@@ -100,12 +101,58 @@ type Props = {
   usuario: Usuario;
   rota: Rota;
   onAtualizarRota: (rota: Rota) => Promise<boolean>;
+  /** Relê a rota do servidor sem piscar nem avisar de falhas (o gestor pode ter mudado algo por fora). */
+  onAtualizar?: () => Promise<void>;
   onSair: () => void;
 };
 
-export function TelaMotorista({usuario, rota, onAtualizarRota, onSair}: Props) {
+/** Telas só de acompanhamento: a rota é relida sozinha. Nas de preenchimento (assinatura, foto, status, nova parada) nada é relido. */
+const FLUXOS_ATUALIZADOS: Fluxo[] = ['base', 'rota', 'ativa', 'pausada'];
+const INTERVALO_DE_ATUALIZACAO_MS = 30000;
+
+export function TelaMotorista({usuario, rota, onAtualizarRota, onAtualizar, onSair}: Props) {
   const [aba, setAba] = useState<Aba>('Hoje');
   const [fluxo, setFluxo] = useState<Fluxo>('base');
+
+  // Atualização automática: a cada 30 s e ao voltar ao primeiro plano, só nas telas de acompanhamento.
+  const atualizarRef = React.useRef(onAtualizar);
+  atualizarRef.current = onAtualizar;
+  const atualizada = FLUXOS_ATUALIZADOS.includes(fluxo);
+  React.useEffect(() => {
+    if (!atualizada || !atualizarRef.current) {
+      return undefined;
+    }
+    const atualizar = () => {
+      atualizarRef.current?.().catch(() => {});
+    };
+    let temporizador: ReturnType<typeof setInterval> | null = null;
+    const ligar = () => {
+      if (temporizador === null) {
+        temporizador = setInterval(atualizar, INTERVALO_DE_ATUALIZACAO_MS);
+      }
+    };
+    const desligar = () => {
+      if (temporizador !== null) {
+        clearInterval(temporizador);
+        temporizador = null;
+      }
+    };
+    if (AppState.currentState !== 'background') {
+      ligar();
+    }
+    const assinatura = AppState.addEventListener('change', estado => {
+      if (estado === 'active') {
+        atualizar();
+        ligar();
+      } else {
+        desligar();
+      }
+    });
+    return () => {
+      desligar();
+      assinatura.remove();
+    };
+  }, [atualizada]);
   const [paradaId, setParadaId] = useState(rota.paradas[0]?.id ?? '');
   const [tipo, setTipo] = useState<TipoParada>('Entrega');
   const [destinatario, setDestinatario] = useState('');

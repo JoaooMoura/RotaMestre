@@ -161,9 +161,19 @@ export function IndicadorLocalizacaoConectado() {
 }
 
 /** Avisa o motorista, em texto, que a posição está sendo compartilhada com o gestor (ou que não está chegando). */
-export function AvisoDeCompartilhamento({estado}: {estado: 'inativo' | 'ativo' | 'falhou'}) {
+export function AvisoDeCompartilhamento({estado}: {estado: 'inativo' | 'ativo' | 'falhou' | 'rotaMudou'}) {
   if (estado === 'inativo') {
     return null;
+  }
+  if (estado === 'rotaMudou') {
+    // O servidor recusou: não é falta de rede. A rota foi passada a outro motorista ou encerrada por fora.
+    const aviso = 'Esta rota não é mais sua ou foi encerrada. Sua localização deixou de ser compartilhada.';
+    return (
+      <View style={estilos.localizacaoLinha} accessible accessibilityRole="alert" accessibilityLabel={aviso}>
+        <MaterialDesignIcons name="alert-circle-outline" size={24} color={cores.acentoTexto} />
+        <Text style={[estilos.textoApoio, estilos.flex, {color: cores.acentoTexto}]}>{aviso}</Text>
+      </View>
+    );
   }
   const falhou = estado === 'falhou';
   const texto = falhou
@@ -220,6 +230,7 @@ export function ResumoDeAvisosConectado() {
   const problema =
     (descricao !== null && (descricao.tom === 'erro' || descricao.tom === 'aviso')) ||
     compartilhamento === 'falhou' ||
+    compartilhamento === 'rotaMudou' ||
     (registro !== 'inativo' && registro !== 'gravando');
 
   if (!descricao && compartilhamento === 'inativo' && registro === 'inativo') {

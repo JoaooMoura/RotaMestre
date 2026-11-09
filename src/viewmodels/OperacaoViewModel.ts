@@ -47,6 +47,9 @@ export type EstadoOperacao =
       offline?: {baixadoEm: number};
     };
 
+/** `aceitarSemRota`: se o servidor já não tem rota para este usuário (ex.: reatribuída), mostra "sem rota" em vez de manter a antiga. */
+export type OpcoesDaAtualizacaoSilenciosa = {aceitarSemRota?: boolean};
+
 export type ResultadoSalvar = {ok: true} | {ok: false; mensagem?: string};
 
 export type OpcoesDaOperacao = {
@@ -68,7 +71,7 @@ export type OperacaoViewModel = {
    * Relê a rota e os motoristas sem trocar a tela por "carregando" e sem avisar de falhas: só troca o estado
    * se algo mudou. Serve para a tela do gestor se manter em dia (o que o motorista faz não chega sozinho).
    */
-  atualizarSilenciosa: () => Promise<void>;
+  atualizarSilenciosa: (opcoes?: OpcoesDaAtualizacaoSilenciosa) => Promise<void>;
   atualizarRota: (rota: Rota) => Promise<ResultadoSalvar>;
 };
 
@@ -179,7 +182,7 @@ export function useOperacaoViewModel(
     versaoDosDados.current++;
   }, [estado]);
 
-  const atualizarSilenciosa = useCallback(async () => {
+  const atualizarSilenciosa = useCallback(async (opcoesDaLeitura: OpcoesDaAtualizacaoSilenciosa = {}) => {
     const atual = estadoAtual.current;
     if (!usuario || somenteLocal || atual.tipo !== 'pronto' || atual.offline) {
       return;
@@ -192,7 +195,13 @@ export function useOperacaoViewModel(
         usuario.papel === 'gestor' ? servico.buscarMotoristas() : Promise.resolve(atual.motoristas),
       ]);
       const agora = estadoAtual.current;
-      if (!rota || agora.tipo !== 'pronto' || versao !== versaoDosDados.current || doUsuario !== usuarioAtual.current) {
+      if (agora.tipo !== 'pronto' || versao !== versaoDosDados.current || doUsuario !== usuarioAtual.current) {
+        return;
+      }
+      if (!rota) {
+        if (opcoesDaLeitura.aceitarSemRota) {
+          setEstado({tipo: 'semRota'});
+        }
         return;
       }
       if (JSON.stringify(agora.rota) === JSON.stringify(rota) && JSON.stringify(agora.motoristas) === JSON.stringify(motoristas)) {

@@ -16,7 +16,8 @@ export type ServicoCompartilhamento = {
   parar: () => Promise<void>;
 };
 
-export type EstadoDoCompartilhamento = 'inativo' | 'ativo' | 'falhou';
+/** `rotaMudou`: o servidor recusou a posição porque a rota deixou de ser do motorista ou foi encerrada por fora. */
+export type EstadoDoCompartilhamento = 'inativo' | 'ativo' | 'falhou' | 'rotaMudou';
 
 export const POLITICA_COMPARTILHAMENTO = {
   intervaloMinimoMs: 15_000,
@@ -32,14 +33,22 @@ type Parametros = {
   servico: ServicoCompartilhamento;
   relogio: Relogio;
   aoEstado: (estado: EstadoDoCompartilhamento) => void;
+  /** Chamado uma vez quando o servidor recusa por a rota ter mudado (403/409): o envio já parou. */
+  aoRotaMudar?: () => void;
 };
+
+/** 403/409 do servidor: rota reatribuída, concluída por fora ou sem rota em andamento. Não é falta de rede. */
+function rotaMudou(erro: unknown): boolean {
+  const status = (erro as {status?: unknown} | null)?.status;
+  return status === 403 || status === 409;
+}
 
 /**
  * Compartilha a posição com o gestor enquanto está ligado: envia ao começar, a cada 30 m andados (no mínimo
  * 15 s entre envios) e a cada 60 s no máximo. Leituras imprecisas ou velhas não são enviadas. Falha de rede
  * não acumula nada: só a leitura mais nova importa. `parar()` avisa o servidor e é idempotente.
  */
-export function iniciarCompartilhamento({posicaoStore, servico, relogio, aoEstado}: Parametros): {parar: () => void} {
+export function iniciarCompartilhamento({posicaoStore, servico, relogio, aoEstado, aoRotaMudar}: Parametros): {parar: () => void} {
   const {intervaloMinimoMs, distanciaMinimaM, intervaloMaximoMs, precisaoMaximaM, idadeMaximaMs} = POLITICA_COMPARTILHAMENTO;
   let encerrado = false;
   let enviando = false;
@@ -89,8 +98,18 @@ export function iniciarCompartilhamento({posicaoStore, servico, relogio, aoEstad
         registradaEm: posicao.registradaEm,
       });
       definirEstado('ativo');
-    } catch {
-      definirEstado('falhou');
+    } catch (erro) {
+      if (rotaMudou(erro)) {
+        // Para de enviar: insistir só repetiria a recusa. Quem usa o estado recarrega a rota.
+        definirEstado('rotaMudou');
+        if (!encerrado) {
+          encerrado = true;
+          cancelar();
+          aoRotaMudar?.();
+        }
+      } else {
+        definirEstado('falhou');
+      }
     } finally {
       enviando = false;
     }

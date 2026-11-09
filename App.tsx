@@ -137,6 +137,7 @@ function ConteudoApp() {
           usuario={usuario}
           rota={estado.rota}
           onAtualizarRota={salvar}
+          onAtualizar={atualizarSilenciosa}
           onSair={sair}
         />
       );
@@ -145,7 +146,7 @@ function ConteudoApp() {
 
   return (
     <LocalizacaoProvider ativo={rotaEmAndamento} dependencias={dependenciasLocalizacaoPadrao}>
-      <CompartilhamentoProvider ativo={compartilharPosicao}>
+      <CompartilhamentoProvider ativo={compartilharPosicao} aoRotaMudar={() => atualizarSilenciosa({aceitarSemRota: true})}>
         <RegistroDeViagemProvider viagem={viagemParaGravar}>
           <NavegacaoProvider voz={servicoVozNativo} tela={servicoTelaNativo} alerta={servicoAlertaNativo}>
             <OfflineProvider valor={offline}>
