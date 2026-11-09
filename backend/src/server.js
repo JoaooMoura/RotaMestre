@@ -9,6 +9,7 @@ const {
   validarValidadeToken,
 } = require('./autenticacao');
 const {criarRepositorio} = require('./database');
+const V = require('./validacao');
 const {criarServicoRoteamento, hashDosPontos} = require('./roteamento');
 const {carregarLimites, criarIndiceDeLimites} = require('./limites');
 
@@ -54,6 +55,14 @@ function validarCadastroMotorista(dados) {
   if (!dados || ![dados.id, dados.nome, dados.email, dados.senha, dados.veiculo].every(textoValido)) {
     return {erro: 'Dados obrigatórios faltando.'};
   }
+  const erroCampo =
+    V.validarEmail(dados.email) ||
+    V.validarSenhaDeCadastro(dados.senha) ||
+    V.validarNomeCompleto(dados.nome) ||
+    V.validarVeiculo(dados.veiculo);
+  if (erroCampo) {
+    return {erro: erroCampo};
+  }
   const telefone = somenteDigitos(dados.telefone);
   if (telefone.length < 10 || telefone.length > 11) {
     return {erro: 'Telefone inválido.'};
@@ -70,8 +79,14 @@ function validarCadastroMotorista(dados) {
   if (!cnhValidade) {
     return {erro: 'Data de validade da CNH inválida.'};
   }
+  const erroValidade = V.validarValidadeCnh(dados.cnhValidade);
+  if (erroValidade) {
+    return {erro: erroValidade};
+  }
   const email = dados.email.trim().toLowerCase();
-  return {motorista: {...dados, email, telefone, cnhNumero, cnhCategoria, cnhValidade}};
+  const nome = dados.nome.trim().replace(/\s+/g, ' ');
+  const veiculo = dados.veiculo.trim();
+  return {motorista: {...dados, nome, email, veiculo, telefone, cnhNumero, cnhCategoria, cnhValidade}};
 }
 
 const ASSINATURA_MAX_BYTES = 512 * 1024;
@@ -93,6 +108,11 @@ function comprovanteValido(comprovante, status) {
   if (comprovante.assinatura === undefined) {
     return comprovante.foto === undefined;
   }
+  // Comprovante novo (com assinatura): o nome do recebedor segue a regra de tamanho.
+  if (V.validarTamanho(comprovante.recebedor, V.LIMITES.recebedor, 'o nome do recebedor')) {
+    return false;
+  }
+  comprovante.recebedor = comprovante.recebedor.trim();
   return (
     status === 'Concluída' &&
     typeof comprovante.assinatura === 'string' &&
@@ -115,9 +135,11 @@ function validarEnvioDeComprovante(corpo) {
   if (typeof corpo.coletadoPor !== 'string' || corpo.coletadoPor.length === 0 || corpo.coletadoPor.length > 80) {
     return 'Informe a conta que coletou a assinatura.';
   }
-  if (!textoValido(corpo.recebedor)) {
-    return 'Informe o nome do recebedor.';
+  const erroRecebedor = V.validarTamanho(corpo.recebedor, V.LIMITES.recebedor, 'o nome do recebedor');
+  if (erroRecebedor) {
+    return erroRecebedor;
   }
+  corpo.recebedor = corpo.recebedor.trim();
   if (
     typeof corpo.assinatura !== 'string' ||
     !corpo.assinatura.startsWith('data:image/png;base64,') ||
@@ -193,7 +215,12 @@ function temLocalizacao(parada) {
   return parada.latitude !== undefined && parada.longitude !== undefined;
 }
 
-function validarRota(rota) {
+/**
+ * Valida a rota recebida. `existente` é a rota já salva (ou null na criação). As regras de formato valem para o
+ * que é novo ou mudou: valores antigos já gravados (ex.: data "Hoje", janela "Parada imprevista") continuam
+ * podendo ser salvos sem alteração, porque o app reenvia a rota inteira a cada atualização.
+ */
+function validarRota(rota, existente = null) {
   if (
     !rota ||
     !textoValido(rota.id) ||
@@ -208,7 +235,29 @@ function validarRota(rota) {
     return 'Informe a rota, o motorista e pelo menos duas paradas válidas.';
   }
 
+  const mudou = (campo, antigo) => !existente || antigo === undefined || rota[campo] !== antigo;
+  if (mudou('nome', existente?.nome)) {
+    const erro = V.validarTamanho(rota.nome, V.LIMITES.nomeRota, 'o nome da rota');
+    if (erro) {
+      return erro;
+    }
+    rota.nome = rota.nome.trim();
+  }
+  if (mudou('data', existente?.data)) {
+    const erro = V.validarDataDaRota(rota.data, {criacao: !existente});
+    if (erro) {
+      return erro;
+    }
+  }
+  if (mudou('horario', existente?.horario)) {
+    const erro = V.validarHorario(rota.horario);
+    if (erro) {
+      return erro;
+    }
+  }
+
   const ids = new Set();
+  const paradasSalvas = new Map((existente?.paradas ?? []).map(parada => [parada.id, parada]));
 
   for (const parada of rota.paradas) {
     if (
@@ -222,6 +271,36 @@ function validarRota(rota) {
       !STATUS_PARADA.has(parada.status)
     ) {
       return 'Existe uma parada inválida ou duplicada na rota.';
+    }
+
+    const salva = paradasSalvas.get(parada.id);
+    const campoNovo = (campo) => !salva || salva[campo] !== parada[campo];
+    if (campoNovo('destinatario')) {
+      const erro = V.validarTamanho(parada.destinatario, V.LIMITES.destinatario, 'o destinatário');
+      if (erro) {
+        return erro;
+      }
+      parada.destinatario = parada.destinatario.trim();
+    }
+    if (campoNovo('endereco')) {
+      const erro = V.validarTamanho(parada.endereco, V.LIMITES.endereco, 'o endereço');
+      if (erro) {
+        return erro;
+      }
+      parada.endereco = parada.endereco.trim();
+    }
+    if (campoNovo('janela')) {
+      const erro = V.validarJanela(parada.janela);
+      if (erro) {
+        return erro;
+      }
+      parada.janela = parada.janela.trim() || 'Sem janela definida';
+    }
+    if (campoNovo('observacao')) {
+      if (parada.observacao.trim().length > V.LIMITES.observacao.max) {
+        return `A observação deve ter no máximo ${V.LIMITES.observacao.max} caracteres.`;
+      }
+      parada.observacao = parada.observacao.trim();
     }
 
     if (!coordenadasValidas(parada)) {
@@ -238,6 +317,27 @@ function validarRota(rota) {
     ids.add(parada.id);
   }
 
+  return null;
+}
+
+/**
+ * Quando o gestor salva uma rota que já existe, o andamento pertence ao motorista: o status da rota, o status e o
+ * comprovante de cada parada existente vêm do banco, mesmo que a tela do gestor esteja desatualizada. O gestor muda
+ * motorista, nome, data, horário e dados das paradas, e pode acrescentar paradas (entram Pendente).
+ * Devolve uma mensagem de erro quando tenta remover uma parada já concluída.
+ */
+function preservarProgressoDoMotorista(rota, existente) {
+  const noBanco = new Map(existente.paradas.map(parada => [parada.id, parada]));
+  const enviadas = new Set(rota.paradas.map(parada => parada.id));
+  const removida = existente.paradas.find(parada => parada.status === 'Concluída' && !enviadas.has(parada.id));
+  if (removida) {
+    return `A parada "${removida.destinatario}" já foi concluída pelo motorista e não pode ser removida da rota.`;
+  }
+  rota.status = existente.status;
+  for (const parada of rota.paradas) {
+    delete parada.comprovante;
+    parada.status = noBanco.get(parada.id)?.status ?? 'Pendente';
+  }
   return null;
 }
 
@@ -616,7 +716,7 @@ function criarServidor({
         const usuario = exigirUsuario(requisicao);
         const rota = await lerJson(requisicao);
         rota.id = decodeURIComponent(rotaEncontrada[1]);
-        const erroValidacao = validarRota(rota);
+        const erroValidacao = validarRota(rota, repositorio.buscarRota(rota.id) ?? null);
 
         if (erroValidacao) {
           responder(resposta, 400, {mensagem: erroValidacao});
@@ -630,6 +730,13 @@ function criarServidor({
             rota.motoristaId !== usuario.id
           ) {
             throw erroHttp(403, 'Motorista só pode alterar a própria rota.');
+          }
+        } else {
+          const existente = repositorio.buscarRota(rota.id);
+          const erroProgresso = existente ? preservarProgressoDoMotorista(rota, existente) : null;
+          if (erroProgresso) {
+            responder(resposta, 409, {mensagem: erroProgresso});
+            return;
           }
         }
 
