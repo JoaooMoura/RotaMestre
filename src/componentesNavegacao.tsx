@@ -198,10 +198,16 @@ export function FaixaDeAproximacao({guia}: {guia: GuiaDeNavegacao | null}) {
   );
 }
 
-type AlertasProps = {guia: GuiaDeNavegacao | null; semLocalizacao: boolean; recalculo?: EstadoDoRecalculo};
+type AlertasProps = {
+  guia: GuiaDeNavegacao | null;
+  semLocalizacao: boolean;
+  recalculo?: EstadoDoRecalculo;
+  /** A velocidade e o limite aparecem em outro lugar (painel de baixo). */
+  semVelocidade?: boolean;
+};
 
 /** Alertas de navegação (US05.05) abaixo da instrução da manobra. */
-export function AlertasDaNavegacao({guia, semLocalizacao, recalculo}: AlertasProps) {
+export function AlertasDaNavegacao({guia, semLocalizacao, recalculo, semVelocidade}: AlertasProps) {
   if (semLocalizacao || !guia || guia.chegou) {
     return null;
   }
@@ -218,7 +224,7 @@ export function AlertasDaNavegacao({guia, semLocalizacao, recalculo}: AlertasPro
         </View>
       ) : null}
       <FaixaDeAproximacao guia={guia} />
-      {guia.foraDaRota ? null : <FaixaDeVelocidade velocidade={guia.velocidade} />}
+      {guia.foraDaRota || semVelocidade ? null : <FaixaDeVelocidade velocidade={guia.velocidade} />}
     </>
   );
 }
@@ -255,9 +261,13 @@ type PainelProps = {
   aoAlternarVoz: () => void;
   aoEncerrar: () => void;
   aoInstalarVoz: () => void;
+  /** Painel enxuto: sem a nota de estimativa. */
+  compacto?: boolean;
+  /** Conteúdo entre a distância restante e os botões (previsão, avisos). */
+  children?: React.ReactNode;
 };
 
-export function PainelDeNavegacao({guia, voz, aoAlternarVoz, aoEncerrar, aoInstalarVoz}: PainelProps) {
+export function PainelDeNavegacao({guia, voz, aoAlternarVoz, aoEncerrar, aoInstalarVoz, compacto, children}: PainelProps) {
   const vozDisponivel = voz.disponibilidade === 'disponivel' || voz.disponibilidade === 'verificando';
   return (
     <View>
@@ -267,11 +277,12 @@ export function PainelDeNavegacao({guia, voz, aoAlternarVoz, aoEncerrar, aoInsta
             Restam {formatarDistancia(guia.restanteM)}
             {guia.restanteM >= 50 ? ` • ${formatarDuracao(guia.restanteS)}` : ''}
           </Text>
-          <Text style={estilos.textoApoio}>Estimativa pela distância das vias, sem trânsito.</Text>
+          {compacto ? null : <Text style={estilos.textoApoio}>Estimativa pela distância das vias, sem trânsito.</Text>}
         </>
       ) : null}
+      {children}
       <AvisoDeVoz voz={voz} aoInstalarVoz={aoInstalarVoz} />
-      {__DEV__ && voz.ultimaFala ? <Text style={estilos.textoApoio}>Última fala: {voz.ultimaFala}</Text> : null}
+      {__DEV__ && !compacto && voz.ultimaFala ? <Text style={estilos.textoApoio}>Última fala: {voz.ultimaFala}</Text> : null}
       <View style={estilos.mapaDevBotoes}>
         <Pressable
           accessibilityRole="switch"
@@ -305,10 +316,19 @@ export function FaixaDaManobraConectada({navegacao}: {navegacao: NavegacaoViewMo
 
 export function AlertasDaNavegacaoConectados({navegacao}: {navegacao: NavegacaoViewModel}) {
   const guia = useGuiaDeNavegacao(navegacao);
-  return <AlertasDaNavegacao guia={guia} semLocalizacao={navegacao.semLocalizacao} recalculo={navegacao.recalculo} />;
+  return <AlertasDaNavegacao guia={guia} semLocalizacao={navegacao.semLocalizacao} recalculo={navegacao.recalculo} semVelocidade />;
 }
 
-export function PainelDeNavegacaoConectado({navegacao}: {navegacao: NavegacaoViewModel}) {
+/** Velocidade e limite no painel de baixo; some quando a faixa de cima já explica a situação (sem GPS, fora da rota, chegada). */
+export function VelocidadeDaNavegacaoConectada({navegacao}: {navegacao: NavegacaoViewModel}) {
+  const guia = useGuiaDeNavegacao(navegacao);
+  if (navegacao.semLocalizacao || !guia || guia.chegou || guia.foraDaRota) {
+    return null;
+  }
+  return <FaixaDeVelocidade velocidade={guia.velocidade} />;
+}
+
+export function PainelDeNavegacaoConectado({navegacao, children}: {navegacao: NavegacaoViewModel; children?: React.ReactNode}) {
   const guia = useGuiaDeNavegacao(navegacao);
   return (
     <PainelDeNavegacao
@@ -317,7 +337,9 @@ export function PainelDeNavegacaoConectado({navegacao}: {navegacao: NavegacaoVie
       aoAlternarVoz={navegacao.alternarVoz}
       aoEncerrar={navegacao.encerrar}
       aoInstalarVoz={navegacao.instalarVozes}
-    />
+      compacto>
+      {children}
+    </PainelDeNavegacao>
   );
 }
 
@@ -325,10 +347,12 @@ type PrevisaoProps = {
   previsoes: PrevisaoDeParada[];
   /** `true` quando a navegação ainda não começou: a previsão supõe sair agora. */
   suposicaoDePartida: boolean;
+  /** Uma linha só: sem a nota de estimativa e sem a lista por parada. */
+  compacta?: boolean;
 };
 
 /** Horário previsto de chegada a cada parada restante, sempre identificado como estimativa. */
-export function PrevisaoDeChegada({previsoes, suposicaoDePartida}: PrevisaoProps) {
+export function PrevisaoDeChegada({previsoes, suposicaoDePartida, compacta}: PrevisaoProps) {
   const [aberta, setAberta] = useState(false);
   if (previsoes.length === 0) {
     return <Text style={estilos.textoApoio}>Todas as paradas foram concluídas.</Text>;
@@ -337,6 +361,16 @@ export function PrevisaoDeChegada({previsoes, suposicaoDePartida}: PrevisaoProps
   const final = previsoes[previsoes.length - 1];
   const texto = (p: PrevisaoDeParada) => (p.chegadaEm === null ? 'sem estimativa' : formatarHorario(p.chegadaEm));
   const resumo = `Próxima parada ${proxima.numero}: ${texto(proxima)}${previsoes.length > 1 ? ` • Final: ${texto(final)}` : ''}`;
+  if (compacta) {
+    return (
+      <View style={estilos.localizacaoLinha} accessible accessibilityLabel={`Previsão de chegada estimada. ${resumo}`}>
+        <MaterialDesignIcons name="clock-outline" size={20} color={cores.textoApoio} />
+        <Text style={[estilos.localizacaoTitulo, estilos.flex, {color: cores.textoForte}]} numberOfLines={1}>
+          {resumo}
+        </Text>
+      </View>
+    );
+  }
   return (
     <View>
       <Text style={estilos.mapaPainelTitulo} accessibilityLabel={`Previsão de chegada. ${resumo}`}>
@@ -384,7 +418,7 @@ const DEGRAU_DO_PROGRESSO_M = 25;
  * Previsão ligada ao trajeto e ao progresso da navegação. Só este componente reage ao guia; o
  * cálculo é refeito a cada 25 m andados, a cada 30 s ou quando o trajeto muda (recálculo).
  */
-export function PrevisaoDeChegadaConectada({trajeto, navegacao}: {trajeto: Trajeto; navegacao: NavegacaoViewModel}) {
+export function PrevisaoDeChegadaConectada({trajeto, navegacao, compacta}: {trajeto: Trajeto; navegacao: NavegacaoViewModel; compacta?: boolean}) {
   const guia = useGuiaDeNavegacao(navegacao);
   const [relogio, setRelogio] = useState(() => Date.now());
   useEffect(() => {
@@ -399,5 +433,5 @@ export function PrevisaoDeChegadaConectada({trajeto, navegacao}: {trajeto: Traje
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [plano, trajeto.paradas, degrau, relogio],
   );
-  return <PrevisaoDeChegada previsoes={previsoes} suposicaoDePartida={guia === null} />;
+  return <PrevisaoDeChegada previsoes={previsoes} suposicaoDePartida={guia === null} compacta={compacta} />;
 }

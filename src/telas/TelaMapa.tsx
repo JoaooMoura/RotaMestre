@@ -8,8 +8,9 @@ import {
   FaixaDaManobraConectada,
   PainelDeNavegacaoConectado,
   PrevisaoDeChegadaConectada,
+  VelocidadeDaNavegacaoConectada,
 } from '../componentesNavegacao';
-import {IndicadorLocalizacaoConectado} from '../componentesLocalizacao';
+import {IndicadorLocalizacaoConectado, ResumoDeAvisosConectado} from '../componentesLocalizacao';
 import {AvisoSemConexaoConectado} from '../componentesOffline';
 import {URL_ESTILO_MAPA} from '../configuracao';
 import {cores, estilos} from '../estilos';
@@ -203,36 +204,42 @@ function MapaDoTrajeto({trajeto: trajetoOriginal}: {trajeto: Trajeto}) {
 
       <View style={estilos.mapaPainel}>
         <AvisoSemConexaoConectado />
-        <IndicadorLocalizacaoConectado />
         {navegando ? (
-          <PainelDeNavegacaoConectado navegacao={navegacao} />
-        ) : selecionada ? (
           <>
-            <Text style={estilos.mapaPainelTitulo}>{selecionada.destinatario}</Text>
-            <Text style={estilos.textoApoio}>{selecionada.endereco}</Text>
-            <Text style={estilos.textoApoio}>
-              {selecionada.tipo} • {selecionada.status}
-            </Text>
+            <VelocidadeDaNavegacaoConectada navegacao={navegacao} />
+            <PainelDeNavegacaoConectado navegacao={navegacao}>
+              <PrevisaoDeChegadaConectada trajeto={trajeto} navegacao={navegacao} compacta />
+              <ResumoDeAvisosConectado />
+            </PainelDeNavegacaoConectado>
           </>
         ) : (
           <>
-            <Text style={estilos.mapaPainelTitulo}>
-              {trajeto.paradas.length} paradas • {formatarDistancia(trajeto.distanciaM)} •{' '}
-              {formatarDuracao(trajeto.duracaoS)}
-            </Text>
-            <Text style={estilos.textoApoio}>
-              Estimativa pela distância das vias, sem trânsito. Toque em uma parada para ver os detalhes.
-            </Text>
-          </>
-        )}
-        <PrevisaoDeChegadaConectada trajeto={trajeto} navegacao={navegacao} />
-        {navegando ? null : (
-          <>
+            <IndicadorLocalizacaoConectado />
+            {selecionada ? (
+              <>
+                <Text style={estilos.mapaPainelTitulo}>{selecionada.destinatario}</Text>
+                <Text style={estilos.textoApoio}>{selecionada.endereco}</Text>
+                <Text style={estilos.textoApoio}>
+                  {selecionada.tipo} • {selecionada.status}
+                </Text>
+              </>
+            ) : (
+              <>
+                <Text style={estilos.mapaPainelTitulo}>
+                  {trajeto.paradas.length} paradas • {formatarDistancia(trajeto.distanciaM)} •{' '}
+                  {formatarDuracao(trajeto.duracaoS)}
+                </Text>
+                <Text style={estilos.textoApoio}>
+                  Estimativa pela distância das vias, sem trânsito. Toque em uma parada para ver os detalhes.
+                </Text>
+              </>
+            )}
+            <PrevisaoDeChegadaConectada trajeto={trajeto} navegacao={navegacao} />
             <BotaoPrincipal titulo="Iniciar navegação" desabilitado={!navegacao.podeIniciar} onPress={navegacao.iniciar} />
             {navegacao.motivoDeNaoPoderIniciar ? <Text style={estilos.textoApoio}>{navegacao.motivoDeNaoPoderIniciar}</Text> : null}
           </>
         )}
-        <PainelSimuladorGps rota={rotaSimulada} />
+        <PainelSimuladorGps rota={rotaSimulada} recolhivel={navegando} />
       </View>
     </View>
   );

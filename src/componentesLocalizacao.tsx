@@ -1,4 +1,4 @@
-import React, {useEffect, useReducer} from 'react';
+import React, {useEffect, useReducer, useState} from 'react';
 import {Keyboard, Pressable, Text, TextInput, TextInputProps, View} from 'react-native';
 import {MaterialDesignIcons} from '@react-native-vector-icons/material-design-icons';
 import {cores, estilos} from './estilos';
@@ -201,6 +201,60 @@ export function AvisoDeRegistro({estado}: {estado: EstadoDoRegistro}) {
         color={problema ? cores.acentoTexto : cores.textoApoio}
       />
       <Text style={[estilos.textoApoio, estilos.flex, problema && {color: cores.acentoTexto}]}>{texto}</Text>
+    </View>
+  );
+}
+
+/**
+ * Versão enxuta dos avisos de localização, compartilhamento e gravação para a navegação: uma linha com ícones.
+ * Os detalhes ficam atrás de "Detalhes" (fechado por padrão), mas qualquer problema (permissão, GPS, sem conexão,
+ * falha ao gravar) abre o bloco completo, porque ali estão as ações para resolver.
+ */
+export function ResumoDeAvisosConectado() {
+  const localizacao = useLocalizacao();
+  const compartilhamento = useCompartilhamento();
+  const registro = useEstadoDoRegistro();
+  const posicao = usePosicaoAtual();
+  const [aberto, setAberto] = useState(false);
+  const descricao = descreverLocalizacao(localizacao.estado, posicao, Date.now(), localizacao.somentePrimeiroPlano);
+  const problema =
+    (descricao !== null && (descricao.tom === 'erro' || descricao.tom === 'aviso')) ||
+    compartilhamento === 'falhou' ||
+    (registro !== 'inativo' && registro !== 'gravando');
+
+  if (!descricao && compartilhamento === 'inativo' && registro === 'inativo') {
+    return null;
+  }
+  if (problema || aberto) {
+    return (
+      <View>
+        <IndicadorLocalizacaoConectado />
+        {problema ? null : (
+          <Pressable accessibilityRole="button" accessibilityLabel="Esconder detalhes" style={estilos.localizacaoAcao} onPress={() => setAberto(false)}>
+            <Text style={estilos.localizacaoAcaoTexto}>Esconder detalhes</Text>
+          </Pressable>
+        )}
+      </View>
+    );
+  }
+  const partes = [
+    descricao?.titulo,
+    compartilhamento === 'ativo' ? 'compartilhando com o gestor' : null,
+    registro === 'gravando' ? 'gravando o trajeto' : null,
+  ].filter(Boolean);
+  return (
+    <View style={estilos.localizacaoLinha}>
+      <View style={[estilos.localizacaoLinha, estilos.flex]} accessible accessibilityLabel={partes.join(', ')}>
+        <MaterialDesignIcons name={descricao?.icone ?? 'crosshairs-question'} size={20} color={COR_DO_TOM[descricao?.tom ?? 'neutro']} />
+        {compartilhamento === 'ativo' ? <MaterialDesignIcons name="share-variant-outline" size={20} color={cores.textoApoio} /> : null}
+        {registro === 'gravando' ? <MaterialDesignIcons name="map-marker-path" size={20} color={cores.textoApoio} /> : null}
+        <Text style={[estilos.localizacaoTitulo, estilos.flex, {color: cores.textoApoio}]} numberOfLines={1}>
+          {descricao?.titulo ?? ''}
+        </Text>
+      </View>
+      <Pressable accessibilityRole="button" accessibilityLabel="Detalhes" accessibilityState={{expanded: false}} style={estilos.localizacaoAcao} onPress={() => setAberto(true)}>
+        <Text style={estilos.localizacaoAcaoTexto}>Detalhes</Text>
+      </Pressable>
     </View>
   );
 }

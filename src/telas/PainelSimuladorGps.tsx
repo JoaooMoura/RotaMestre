@@ -1,4 +1,4 @@
-import React from 'react';
+import React, {useState} from 'react';
 import {Pressable, Text, View} from 'react-native';
 import {estilos} from '../estilos';
 import {PontoGeografico} from '../geo';
@@ -16,14 +16,31 @@ const CENARIOS: {cenario: CenarioSimulado; rotulo: string}[] = [
 const formatarIntervalo = (ms: number | null) => (ms === null ? '-' : `${ms} ms`);
 
 /** Só em desenvolvimento: GPS simulado e números do ensaio, para testar com o aparelho parado. */
-export function PainelSimuladorGps({rota}: {rota: PontoGeografico[]}) {
+export function PainelSimuladorGps({rota, recolhivel = false}: {rota: PontoGeografico[]; recolhivel?: boolean}) {
   const localizacao = useLocalizacao();
+  const [aberto, setAberto] = useState(false);
 
   // Em produção nada é montado nem assina o diagnóstico (que muda a cada leitura).
   if (!__DEV__ || !localizacao.simuladorDisponivel) {
     return null;
   }
-  return <PainelAberto rota={rota} />;
+  if (!recolhivel) {
+    return <PainelAberto rota={rota} />;
+  }
+  // Recolhido, o painel nem monta (e não assina o diagnóstico, que muda a cada leitura).
+  return (
+    <View>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityState={{expanded: aberto}}
+        accessibilityLabel={aberto ? 'Esconder simulador' : 'Simulador'}
+        style={estilos.localizacaoAcao}
+        onPress={() => setAberto(valor => !valor)}>
+        <Text style={estilos.localizacaoAcaoTexto}>{aberto ? 'Esconder simulador' : 'Simulador'}</Text>
+      </Pressable>
+      {aberto ? <PainelAberto rota={rota} /> : null}
+    </View>
+  );
 }
 
 function PainelAberto({rota}: {rota: PontoGeografico[]}) {
