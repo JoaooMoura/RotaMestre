@@ -146,6 +146,8 @@ export const estilos = StyleSheet.create({
   botaoPerigo: {borderColor: cores.perigo},
   botaoPerigoTexto: {color: cores.perigo},
   botaoDesabilitado: {opacity: 0.45},
+  campoErro: {flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginTop: 6},
+  campoErroTexto: {flex: 1, color: cores.erro, fontSize: 14, lineHeight: 20, fontWeight: '500'},
   grade: {flexDirection: 'row', flexWrap: 'wrap', gap: 10},
   metrica: {
     width: '48%',

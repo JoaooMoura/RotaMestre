@@ -197,7 +197,7 @@ type BotaoContornadoProps = BotaoMd3Props & {
   perigo?: boolean;
 };
 
-export function BotaoContornado({titulo, onPress, icone, perigo}: BotaoContornadoProps) {
+export function BotaoContornado({titulo, onPress, icone, perigo, desabilitado}: BotaoContornadoProps) {
   const cor = perigo ? cores.erro : cores.primaria;
   const {estiloEscala, aoPressionar, aoSoltar} = useEscalaAoPressionar();
   return (
@@ -205,11 +205,14 @@ export function BotaoContornado({titulo, onPress, icone, perigo}: BotaoContornad
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={titulo}
+        accessibilityState={{disabled: !!desabilitado}}
+        disabled={desabilitado}
         onPress={onPress}
         onPressIn={aoPressionar}
         onPressOut={aoSoltar}
         style={({pressed}) => [
           estilos.loginBotaoContornado,
+          desabilitado && estilos.botaoDesabilitado,
           perigo && estilos.botaoContornadoPerigo,
           pressed &&
             (perigo
@@ -320,9 +323,11 @@ type CampoProps = TextInputProps & {
   mascara?: Mask;
   acao?: React.ReactNode;
   estiloTexto?: TextInputProps['style'];
+  /** Mensagem de erro de validação; aparece abaixo do campo quando ele tem texto e não está em edição. */
+  erro?: string | null;
 };
 
-export function Campo({rotulo, icone, mascara, acao, estiloTexto, onFocus, onBlur, ...props}: CampoProps) {
+export function Campo({rotulo, icone, mascara, acao, estiloTexto, erro, onFocus, onBlur, ...props}: CampoProps) {
   const [focado, setFocado] = useState(false);
   const propsEntrada: TextInputProps = {
     ...props,
@@ -354,7 +359,21 @@ export function Campo({rotulo, icone, mascara, acao, estiloTexto, onFocus, onBlu
         )}
         {acao}
       </View>
+      {erro && !focado && (props.value ?? '') !== '' ? <ErroDoCampo mensagem={erro} /> : null}
     </>
+  );
+}
+
+/** Mensagem de erro de um campo: ícone + texto (nunca só cor). */
+export function ErroDoCampo({mensagem}: {mensagem?: string | null}) {
+  if (!mensagem) {
+    return null;
+  }
+  return (
+    <View style={estilos.campoErro} accessibilityLiveRegion="polite">
+      <MaterialDesignIcons name="alert-circle-outline" size={16} color={cores.erro} />
+      <Text style={estilos.campoErroTexto}>{mensagem}</Text>
+    </View>
   );
 }
 

@@ -18,6 +18,7 @@ import {
   Cabecalho,
   CardParada,
   CartaoRota,
+  ErroDoCampo,
   ItemNavegacao,
   LayoutFaixa,
   NavegacaoInferior,
@@ -28,6 +29,13 @@ import {cores, estilos} from '../estilos';
 import {primeiroNome} from '../nomes';
 import {Comprovante, Parada, Rota, StatusParada, TipoParada, Usuario} from '../tipos';
 import {AvisoDeRestricao, CampoDeTexto, IndicadorLocalizacaoConectado} from '../componentesLocalizacao';
+import {
+  validarDestinatario,
+  validarEndereco,
+  validarMotivo,
+  validarObservacao,
+  validarRecebedor,
+} from '../validacao';
 import {useRestricaoPorMovimento} from '../viewmodels/LocalizacaoViewModel';
 import {MENSAGEM_ENTRAR_PARA_COLETAR} from '../offline';
 import {useOffline} from '../viewmodels/OfflineViewModel';
@@ -115,6 +123,15 @@ export function TelaMotorista({usuario, rota, onAtualizarRota, onSair}: Props) {
   const digitacaoRestrita = useRestricaoPorMovimento();
   const offline = useOffline();
   const aguardandoEnvio = new Set(offline.pendencias.filter(p => p.status !== 'rejeitada').map(p => p.paradaId));
+
+  const erroDestinatario = destinatario ? validarDestinatario(destinatario) : null;
+  const erroEndereco = endereco ? validarEndereco(endereco) : null;
+  const erroObservacao = validarObservacao(observacao);
+  const novaParadaInvalida = !!(validarDestinatario(destinatario) || validarEndereco(endereco) || erroObservacao);
+  const erroMotivo = motivo ? validarMotivo(motivo) : null;
+  const motivoInvalido = statusEscolhido === 'Não realizada' && !!validarMotivo(motivo);
+  const erroRecebedor = nomeRecebedor ? validarRecebedor(nomeRecebedor) : null;
+  const recebedorInvalido = !!validarRecebedor(nomeRecebedor);
 
   const paradaSelecionada =
     rota.paradas.find(item => item.id === paradaId) ?? rota.paradas[0];
@@ -242,9 +259,11 @@ export function TelaMotorista({usuario, rota, onAtualizarRota, onSair}: Props) {
               ))}
             </View>
             <Text style={estilos.rotulo}>Cliente ou destinatário</Text>
-            <CampoDeTexto restrito={digitacaoRestrita} style={estilos.input} value={destinatario} onChangeText={setDestinatario} />
+            <CampoDeTexto restrito={digitacaoRestrita} style={estilos.input} value={destinatario} onChangeText={setDestinatario} maxLength={80} />
+            <ErroDoCampo mensagem={erroDestinatario} />
             <Text style={estilos.rotulo}>Endereço</Text>
-            <CampoDeTexto restrito={digitacaoRestrita} style={estilos.input} value={endereco} onChangeText={setEndereco} />
+            <CampoDeTexto restrito={digitacaoRestrita} style={estilos.input} value={endereco} onChangeText={setEndereco} maxLength={200} />
+            <ErroDoCampo mensagem={erroEndereco} />
             <Text style={estilos.rotulo}>Observação</Text>
             <CampoDeTexto
               restrito={digitacaoRestrita}
@@ -252,21 +271,24 @@ export function TelaMotorista({usuario, rota, onAtualizarRota, onSair}: Props) {
               value={observacao}
               onChangeText={setObservacao}
               multiline
+              maxLength={300}
             />
+            <ErroDoCampo mensagem={erroObservacao} />
             <Botao
               titulo="Adicionar parada"
+              desabilitado={novaParadaInvalida}
               onPress={async () => {
-                if (!destinatario.trim() || !endereco.trim()) {
-                  Alert.alert('Dados incompletos', 'Informe destinatário e endereço.');
+                if (novaParadaInvalida) {
+                  Alert.alert('Dados incompletos', validarDestinatario(destinatario) ?? validarEndereco(endereco) ?? erroObservacao ?? 'Confira os dados da parada.');
                   return;
                 }
                 const nova: Parada = {
                   id: Date.now().toString(),
                   tipo,
-                  destinatario,
-                  endereco,
+                  destinatario: destinatario.trim(),
+                  endereco: endereco.trim(),
                   janela: 'Parada imprevista',
-                  observacao,
+                  observacao: observacao.trim(),
                   status: 'Pendente',
                 };
                 const salva = await onAtualizarRota({
@@ -412,10 +434,13 @@ export function TelaMotorista({usuario, rota, onAtualizarRota, onSair}: Props) {
                 multiline
                 placeholder="Motivo da não realização"
                 placeholderTextColor={cores.contorno}
+                maxLength={200}
               />
             ) : null}
+            {statusEscolhido === 'Não realizada' ? <ErroDoCampo mensagem={erroMotivo} /> : null}
             <Botao
               titulo="Confirmar status"
+              desabilitado={motivoInvalido}
               onPress={async () => {
                 if (statusEscolhido === 'Concluída') {
                   setFluxo('assinatura');
@@ -438,7 +463,8 @@ export function TelaMotorista({usuario, rota, onAtualizarRota, onSair}: Props) {
           <View style={estilos.conteudo}>
             <AvisoDeRestricao restrito={digitacaoRestrita} />
             <Text style={estilos.rotulo}>Nome do recebedor</Text>
-            <CampoDeTexto restrito={digitacaoRestrita} style={estilos.input} value={nomeRecebedor} onChangeText={setNomeRecebedor} />
+            <CampoDeTexto restrito={digitacaoRestrita} style={estilos.input} value={nomeRecebedor} onChangeText={setNomeRecebedor} maxLength={80} />
+            <ErroDoCampo mensagem={erroRecebedor} />
             {assinatura ? (
               <View style={estilos.assinaturaCanvas}>
                 <Image source={{uri: assinatura}} style={estilos.assinaturaPreview} />
@@ -471,7 +497,7 @@ export function TelaMotorista({usuario, rota, onAtualizarRota, onSair}: Props) {
             />
             <Botao
               titulo="Confirmar assinatura"
-              desabilitado={!assinatura || !nomeRecebedor.trim()}
+              desabilitado={!assinatura || recebedorInvalido}
               onPress={() => setFluxo('foto')}
             />
           </View>
