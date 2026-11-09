@@ -46,6 +46,8 @@ export type AppViewModel = {
   /** Motorista com sessão: a programação é atualizada em segundo plano (US06.05). */
   atualizarEmSegundoPlano: boolean;
   recarregar: () => Promise<void>;
+  /** Relê rota e motoristas do gestor sem trocar de tela nem avisar de falhas. */
+  atualizarSilenciosa: () => Promise<void>;
   atualizarRota: (rota: Rota) => Promise<ResultadoSalvar>;
   abrirRotaBaixada: () => Promise<void>;
   sair: () => void;
@@ -95,7 +97,7 @@ export function useAppViewModel(
     () => criarServicoOfflineDaOperacao(armazenamento, offlineBase.registrarPendencia),
     [armazenamento, offlineBase.registrarPendencia],
   );
-  const {estado, recarregar, atualizarRota, tentarReconectar} = useOperacaoViewModel(
+  const {estado, recarregar, atualizarSilenciosa, atualizarRota, tentarReconectar} = useOperacaoViewModel(
     usuario,
     dependencias.operacao,
     servicoOffline,
@@ -196,6 +198,7 @@ export function useAppViewModel(
     viagemParaGravar,
     atualizarEmSegundoPlano: usuarioDaSessao?.papel === 'motorista',
     recarregar,
+    atualizarSilenciosa,
     atualizarRota,
     abrirRotaBaixada,
     sair,

@@ -1,5 +1,5 @@
-import React, {useState} from 'react';
-import {Alert, Pressable, StatusBar, Text, View} from 'react-native';
+import React, {useEffect, useRef, useState} from 'react';
+import {Alert, AppState, Pressable, StatusBar, Text, View} from 'react-native';
 import {MaterialDesignIcons} from '@react-native-vector-icons/material-design-icons';
 import {TransicaoEntrada} from '../animacoes';
 import {
@@ -21,6 +21,18 @@ import {cores, estilos} from '../estilos';
 import {primeiroNome} from '../nomes';
 import {Motorista, Parada, Rota, TipoParada, Usuario} from '../tipos';
 import {TelaFrota} from './TelaFrota';
+import {
+  mascararData,
+  mascararHorario,
+  mascararJanela,
+  validarDataDaRota,
+  validarDestinatario,
+  validarEndereco,
+  validarHorario,
+  validarJanela,
+  validarNomeDaRota,
+  validarObservacao,
+} from '../validacao';
 
 type Aba = 'Início' | 'Rotas' | 'Motoristas' | 'Perfil';
 type Fluxo = 'base' | 'criar' | 'organizar' | 'atribuir' | 'detalhe' | 'reatribuir' | 'frota';
@@ -34,6 +46,9 @@ const ITENS_NAVEGACAO: ItemNavegacao[] = [
 
 const FLUXOS_TELA_CHEIA: Fluxo[] = ['criar', 'organizar', 'atribuir', 'reatribuir'];
 const TOTAL_ETAPAS_CRIACAO = 3;
+/** Telas que se mantêm em dia sozinhas. Nos formulários de criação nada é relido (e nada do que se digita é tocado). */
+const FLUXOS_ATUALIZADOS: Fluxo[] = ['base', 'detalhe', 'reatribuir'];
+const INTERVALO_DE_ATUALIZACAO_MS = 15000;
 
 function dataDeHoje() {
   const hoje = new Date();
@@ -46,6 +61,8 @@ type Props = {
   rota: Rota;
   motoristas: Motorista[];
   onAtualizarRota: (rota: Rota) => Promise<boolean>;
+  /** Relê rota e motoristas do servidor sem piscar a tela nem avisar de falhas. */
+  onAtualizar?: () => Promise<void>;
   onSair: () => void;
 };
 
@@ -54,6 +71,7 @@ export function TelaGestorSprint({
   rota,
   motoristas,
   onAtualizarRota,
+  onAtualizar,
   onSair,
 }: Props) {
   const [aba, setAba] = useState<Aba>('Início');
@@ -71,9 +89,67 @@ export function TelaGestorSprint({
 
   const responsavel = motoristas.find(item => item.id === rota.motoristaId);
 
+  // Atualização automática: ao abrir cada aba/tela, ao voltar ao primeiro plano e a cada 15 s. Para ao sair
+  // dessas telas (formulário de criação, frota - que tem a sua própria consulta) e quando o app vai ao fundo.
+  const atualizarRef = useRef(onAtualizar);
+  atualizarRef.current = onAtualizar;
+  const primeiraVez = useRef(true);
+  const atualizada = FLUXOS_ATUALIZADOS.includes(fluxo);
+  useEffect(() => {
+    if (!atualizada || !atualizarRef.current) {
+      return undefined;
+    }
+    const atualizar = () => {
+      atualizarRef.current?.().catch(() => {});
+    };
+    // A primeira montagem já vem de uma carga recente; depois, abrir uma aba ou tela relê.
+    if (primeiraVez.current) {
+      primeiraVez.current = false;
+    } else {
+      atualizar();
+    }
+    let temporizador: ReturnType<typeof setInterval> | null = null;
+    const ligar = () => {
+      if (temporizador === null) {
+        temporizador = setInterval(atualizar, INTERVALO_DE_ATUALIZACAO_MS);
+      }
+    };
+    const desligar = () => {
+      if (temporizador !== null) {
+        clearInterval(temporizador);
+        temporizador = null;
+      }
+    };
+    if (AppState.currentState !== 'background') {
+      ligar();
+    }
+    const assinatura = AppState.addEventListener('change', estado => {
+      if (estado === 'active') {
+        atualizar();
+        ligar();
+      } else {
+        desligar();
+      }
+    });
+    return () => {
+      desligar();
+      assinatura.remove();
+    };
+  }, [aba, fluxo, atualizada]);
+
+  const erroNome = validarNomeDaRota(nome);
+  const erroData = validarDataDaRota(data);
+  const erroHorario = validarHorario(horario);
+  const erroDestinatario = validarDestinatario(destinatario);
+  const erroEndereco = validarEndereco(endereco);
+  const erroJanela = validarJanela(janela);
+  const erroObservacao = validarObservacao(observacao);
+  const paradaInvalida = !!(erroDestinatario || erroEndereco || erroJanela || erroObservacao);
+  const rotaInvalida = !!(erroNome || erroData || erroHorario);
+
   function adicionarParada() {
-    if (!destinatario.trim() || !endereco.trim()) {
-      Alert.alert('Dados incompletos', 'Informe o destinatário e o endereço.');
+    if (paradaInvalida) {
+      Alert.alert('Dados incompletos', erroDestinatario ?? erroEndereco ?? erroJanela ?? erroObservacao ?? 'Confira os dados da parada.');
       return;
     }
     setParadas(atuais => [
@@ -102,6 +178,10 @@ export function TelaGestorSprint({
   async function salvarAtribuicao() {
     if (!motoristaId) {
       Alert.alert('Motorista obrigatório', 'Selecione um motorista disponível.');
+      return;
+    }
+    if (rotaInvalida) {
+      Alert.alert('Dados da rota inválidos', erroNome ?? erroData ?? erroHorario ?? 'Confira os dados da rota.');
       return;
     }
     const novaRota: Rota = {
@@ -175,20 +255,28 @@ export function TelaGestorSprint({
           value={nome}
           onChangeText={setNome}
           placeholder="Ex.: Entregas Centro"
+          maxLength={60}
+          erro={erroNome}
         />
         <Campo
           rotulo="Data"
           icone="calendar-outline"
           value={data}
-          onChangeText={setData}
+          onChangeText={texto => setData(mascararData(texto))}
           placeholder="DD/MM/AAAA"
+          keyboardType="number-pad"
+          maxLength={10}
+          erro={erroData}
         />
         <Campo
           rotulo="Horário previsto"
           icone="clock-outline"
           value={horario}
-          onChangeText={setHorario}
+          onChangeText={texto => setHorario(mascararHorario(texto))}
           placeholder="08:00"
+          keyboardType="number-pad"
+          maxLength={5}
+          erro={erroHorario}
         />
 
         <Text style={[estilos.secaoRotulo, estilos.secaoRotuloAfastado]}>Nova parada</Text>
@@ -219,6 +307,8 @@ export function TelaGestorSprint({
           value={destinatario}
           onChangeText={setDestinatario}
           placeholder="Cliente ou destinatário"
+          maxLength={80}
+          erro={erroDestinatario}
         />
         <Campo
           rotulo="Endereço"
@@ -226,13 +316,18 @@ export function TelaGestorSprint({
           value={endereco}
           onChangeText={setEndereco}
           placeholder="Endereço completo"
+          maxLength={200}
+          erro={erroEndereco}
         />
         <Campo
           rotulo="Janela de atendimento"
           icone="clock-time-four-outline"
           value={janela}
-          onChangeText={setJanela}
+          onChangeText={texto => setJanela(mascararJanela(texto))}
           placeholder="09:00 - 10:00"
+          keyboardType="number-pad"
+          maxLength={13}
+          erro={erroJanela}
         />
         <Campo
           rotulo="Observações"
@@ -241,8 +336,15 @@ export function TelaGestorSprint({
           onChangeText={setObservacao}
           multiline
           estiloTexto={estilos.campoMultilinha}
+          maxLength={300}
+          erro={erroObservacao}
         />
-        <BotaoContornado titulo="Adicionar parada" icone="plus" onPress={adicionarParada} />
+        <BotaoContornado
+          titulo="Adicionar parada"
+          icone="plus"
+          desabilitado={paradaInvalida}
+          onPress={adicionarParada}
+        />
 
         <Text style={[estilos.secaoRotulo, estilos.secaoRotuloAfastado]}>
           Paradas adicionadas ({paradas.length})
@@ -257,7 +359,7 @@ export function TelaGestorSprint({
         )}
         <BotaoPrincipal
           titulo="Organizar paradas"
-          desabilitado={paradas.length < 2 || !nome.trim()}
+          desabilitado={paradas.length < 2 || rotaInvalida}
           onPress={() => setFluxo('organizar')}
         />
       </LayoutFaixa>

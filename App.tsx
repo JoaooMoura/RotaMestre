@@ -48,6 +48,7 @@ function ConteudoApp() {
     viagemParaGravar,
     atualizarEmSegundoPlano,
     recarregar,
+    atualizarSilenciosa,
     atualizarRota,
     abrirRotaBaixada,
     sair,
@@ -128,6 +129,7 @@ function ConteudoApp() {
           rota={estado.rota}
           motoristas={estado.motoristas}
           onAtualizarRota={salvar}
+          onAtualizar={atualizarSilenciosa}
           onSair={sair}
         />
       ) : (

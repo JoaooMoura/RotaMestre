@@ -64,6 +64,11 @@ export type OperacaoViewModel = {
   recarregar: () => Promise<void>;
   /** Tenta voltar ao servidor sem piscar a tela; devolve se conseguiu. */
   tentarReconectar: () => Promise<boolean>;
+  /**
+   * Relê a rota e os motoristas sem trocar a tela por "carregando" e sem avisar de falhas: só troca o estado
+   * se algo mudou. Serve para a tela do gestor se manter em dia (o que o motorista faz não chega sozinho).
+   */
+  atualizarSilenciosa: () => Promise<void>;
   atualizarRota: (rota: Rota) => Promise<ResultadoSalvar>;
 };
 
@@ -168,6 +173,37 @@ export function useOperacaoViewModel(
     }
   }, [usuario, servico, somenteLocal]);
 
+  // Muda a cada recarga completa e a cada salvamento: uma leitura silenciosa iniciada antes é descartada.
+  const versaoDosDados = useRef(0);
+  useEffect(() => {
+    versaoDosDados.current++;
+  }, [estado]);
+
+  const atualizarSilenciosa = useCallback(async () => {
+    const atual = estadoAtual.current;
+    if (!usuario || somenteLocal || atual.tipo !== 'pronto' || atual.offline) {
+      return;
+    }
+    const versao = versaoDosDados.current;
+    const doUsuario = usuarioAtual.current;
+    try {
+      const [rota, motoristas] = await Promise.all([
+        servico.buscarRotaAtual(),
+        usuario.papel === 'gestor' ? servico.buscarMotoristas() : Promise.resolve(atual.motoristas),
+      ]);
+      const agora = estadoAtual.current;
+      if (!rota || agora.tipo !== 'pronto' || versao !== versaoDosDados.current || doUsuario !== usuarioAtual.current) {
+        return;
+      }
+      if (JSON.stringify(agora.rota) === JSON.stringify(rota) && JSON.stringify(agora.motoristas) === JSON.stringify(motoristas)) {
+        return;
+      }
+      setEstado({tipo: 'pronto', rota, motoristas});
+    } catch {
+      // Silencioso de propósito: sem servidor, a tela segue com o que tem (o 401 já é tratado por quem cuida da sessão).
+    }
+  }, [usuario, servico, somenteLocal]);
+
   useEffect(() => {
     usuarioAtual.current++;
     recarregar();
@@ -250,7 +286,7 @@ export function useOperacaoViewModel(
   );
 
   return useMemo(
-    () => ({estado, recarregar, tentarReconectar, atualizarRota}),
-    [estado, recarregar, tentarReconectar, atualizarRota],
+    () => ({estado, recarregar, tentarReconectar, atualizarSilenciosa, atualizarRota}),
+    [estado, recarregar, tentarReconectar, atualizarSilenciosa, atualizarRota],
   );
 }
