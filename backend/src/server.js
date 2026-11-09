@@ -233,18 +233,29 @@ function temLocalizacao(parada) {
  * podendo ser salvos sem alteração, porque o app reenvia a rota inteira a cada atualização.
  */
 function validarRota(rota, existente = null) {
-  if (
-    !rota ||
-    !textoValido(rota.id) ||
-    !textoValido(rota.nome) ||
-    !textoValido(rota.data) ||
-    !textoValido(rota.horario) ||
-    !textoValido(rota.motoristaId) ||
-    !STATUS_ROTA.has(rota.status) ||
-    !Array.isArray(rota.paradas) ||
-    rota.paradas.length < 2
-  ) {
-    return 'Informe a rota, o motorista e pelo menos duas paradas válidas.';
+  if (!rota) {
+    return 'Informe os dados da rota.';
+  }
+  if (!textoValido(rota.id)) {
+    return 'Informe o código da rota.';
+  }
+  if (!textoValido(rota.nome)) {
+    return 'Informe o nome da rota.';
+  }
+  if (!textoValido(rota.data)) {
+    return 'Informe a data da rota.';
+  }
+  if (!textoValido(rota.horario)) {
+    return 'Informe o horário previsto da rota.';
+  }
+  if (!textoValido(rota.motoristaId)) {
+    return 'Informe o motorista da rota.';
+  }
+  if (!STATUS_ROTA.has(rota.status)) {
+    return 'Status da rota inválido.';
+  }
+  if (!Array.isArray(rota.paradas) || rota.paradas.length < 2) {
+    return 'A rota precisa de pelo menos duas paradas.';
   }
 
   const mudou = (campo, antigo) => !existente || antigo === undefined || rota[campo] !== antigo;
@@ -271,20 +282,34 @@ function validarRota(rota, existente = null) {
   const ids = new Set();
   const paradasSalvas = new Map((existente?.paradas ?? []).map(parada => [parada.id, parada]));
 
-  for (const parada of rota.paradas) {
-    if (
-      !parada ||
-      typeof parada !== 'object' ||
-      !textoValido(parada.id) ||
-      ids.has(parada.id) ||
-      !TIPOS_PARADA.has(parada.tipo) ||
-      !textoValido(parada.destinatario) ||
-      !textoValido(parada.endereco) ||
-      !textoValido(parada.janela) ||
-      typeof parada.observacao !== 'string' ||
-      !STATUS_PARADA.has(parada.status)
-    ) {
-      return 'Existe uma parada inválida ou duplicada na rota.';
+  for (const [indice, parada] of rota.paradas.entries()) {
+    const quando = `Parada ${indice + 1}`;
+    if (!parada || typeof parada !== 'object' || Array.isArray(parada)) {
+      return `${quando}: dados inválidos.`;
+    }
+    if (!textoValido(parada.id)) {
+      return `${quando}: informe o identificador.`;
+    }
+    if (ids.has(parada.id)) {
+      return `${quando}: identificador repetido na rota.`;
+    }
+    if (!TIPOS_PARADA.has(parada.tipo)) {
+      return `${quando}: o tipo deve ser Coleta ou Entrega.`;
+    }
+    if (!textoValido(parada.destinatario)) {
+      return `${quando}: informe o destinatário.`;
+    }
+    if (!textoValido(parada.endereco)) {
+      return `${quando}: informe o endereço.`;
+    }
+    if (!textoValido(parada.janela)) {
+      return `${quando}: informe a janela de atendimento no formato HH:MM - HH:MM.`;
+    }
+    if (typeof parada.observacao !== 'string') {
+      return `${quando}: a observação deve ser um texto (pode ficar vazia).`;
+    }
+    if (!STATUS_PARADA.has(parada.status)) {
+      return `${quando}: status inválido.`;
     }
 
     const salva = paradasSalvas.get(parada.id);
@@ -292,27 +317,27 @@ function validarRota(rota, existente = null) {
     if (campoNovo('destinatario')) {
       const erro = V.validarTamanho(parada.destinatario, V.LIMITES.destinatario, 'o destinatário');
       if (erro) {
-        return erro;
+        return `${quando}: ${erro}`;
       }
       parada.destinatario = parada.destinatario.trim();
     }
     if (campoNovo('endereco')) {
       const erro = V.validarTamanho(parada.endereco, V.LIMITES.endereco, 'o endereço');
       if (erro) {
-        return erro;
+        return `${quando}: ${erro}`;
       }
       parada.endereco = parada.endereco.trim();
     }
     if (campoNovo('janela')) {
       const erro = V.validarJanela(parada.janela);
       if (erro) {
-        return erro;
+        return `${quando}: ${erro}`;
       }
       parada.janela = parada.janela.trim() || 'Sem janela definida';
     }
     if (campoNovo('observacao')) {
       if (parada.observacao.trim().length > V.LIMITES.observacao.max) {
-        return `A observação deve ter no máximo ${V.LIMITES.observacao.max} caracteres.`;
+        return `${quando}: a observação deve ter no máximo ${V.LIMITES.observacao.max} caracteres.`;
       }
       parada.observacao = parada.observacao.trim();
     }

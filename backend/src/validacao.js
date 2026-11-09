@@ -62,8 +62,13 @@ function validarSenhaDeCadastro(valor) {
 
 function validarNomeCompleto(valor) {
   const nome = textoSemEspacos(valor);
-  if (nome.split(/\s+/).filter(Boolean).length < 2) {
+  const palavras = nome.split(/\s+/).filter(Boolean);
+  if (palavras.length < 2) {
     return 'Informe o nome completo (nome e sobrenome).';
+  }
+  // Cada palavra com pelo menos 2 letras: recusa "A B" e iniciais soltas.
+  if (palavras.some(palavra => (palavra.match(/\p{L}/gu) ?? []).length < 2)) {
+    return 'Informe o nome completo: cada palavra deve ter pelo menos 2 letras.';
   }
   if (nome.length > LIMITES.nomePessoa.max) {
     return `O nome deve ter no máximo ${LIMITES.nomePessoa.max} caracteres.`;
