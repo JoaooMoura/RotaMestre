@@ -62,6 +62,7 @@ const MOTORISTA_DEMO = {
 };
 
 const SQLITE_CONSTRAINT_UNIQUE = 2067;
+const SQLITE_CONSTRAINT_PRIMARYKEY = 1555;
 
 function ddlMotoristas(nomeTabela) {
   return `
@@ -315,6 +316,12 @@ function criarRepositorio(caminhoBanco, {seedDemo = false} = {}) {
       if (erro.errcode === SQLITE_CONSTRAINT_UNIQUE && erro.message.includes('usuarios.email')) {
         const duplicado = new Error('Este e-mail já está cadastrado.');
         duplicado.codigo = 'EMAIL_DUPLICADO';
+        throw duplicado;
+      }
+      // Chave primária repetida tem código próprio no SQLite (1555), diferente do UNIQUE comum (2067).
+      if ((erro.errcode === SQLITE_CONSTRAINT_UNIQUE || erro.errcode === SQLITE_CONSTRAINT_PRIMARYKEY) && erro.message.includes('usuarios.id')) {
+        const duplicado = new Error('Este identificador já está em uso.');
+        duplicado.codigo = 'ID_DUPLICADO';
         throw duplicado;
       }
       throw erro;

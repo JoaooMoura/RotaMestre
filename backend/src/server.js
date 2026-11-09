@@ -1,4 +1,5 @@
 const http = require('node:http');
+const crypto = require('node:crypto');
 const path = require('node:path');
 const {Buffer} = require('node:buffer');
 const {URL} = require('node:url');
@@ -51,9 +52,20 @@ function dataIsoValida(valor) {
   return existe ? `${ano}-${mes}-${dia}` : null;
 }
 
+const ID_MAX_CARACTERES = 64;
+
 function validarCadastroMotorista(dados) {
-  if (!dados || ![dados.id, dados.nome, dados.email, dados.senha, dados.veiculo].every(textoValido)) {
+  if (!dados || ![dados.nome, dados.email, dados.senha, dados.veiculo].every(textoValido)) {
     return {erro: 'Dados obrigatórios faltando.'};
+  }
+  // O identificador é opcional: sem ele, o servidor gera um. Se vier, precisa ser um texto curto.
+  let id;
+  if (dados.id === undefined || dados.id === null) {
+    id = `M-${crypto.randomUUID()}`;
+  } else if (typeof dados.id !== 'string' || dados.id.trim() === '' || dados.id.trim().length > ID_MAX_CARACTERES) {
+    return {erro: `Identificador inválido: use um texto de 1 a ${ID_MAX_CARACTERES} caracteres.`};
+  } else {
+    id = dados.id.trim();
   }
   const erroCampo =
     V.validarEmail(dados.email) ||
@@ -86,7 +98,7 @@ function validarCadastroMotorista(dados) {
   const email = dados.email.trim().toLowerCase();
   const nome = dados.nome.trim().replace(/\s+/g, ' ');
   const veiculo = dados.veiculo.trim();
-  return {motorista: {...dados, nome, email, veiculo, telefone, cnhNumero, cnhCategoria, cnhValidade}};
+  return {motorista: {...dados, id, nome, email, veiculo, telefone, cnhNumero, cnhCategoria, cnhValidade}};
 }
 
 const ASSINATURA_MAX_BYTES = 512 * 1024;
@@ -261,6 +273,8 @@ function validarRota(rota, existente = null) {
 
   for (const parada of rota.paradas) {
     if (
+      !parada ||
+      typeof parada !== 'object' ||
       !textoValido(parada.id) ||
       ids.has(parada.id) ||
       !TIPOS_PARADA.has(parada.tipo) ||
@@ -339,6 +353,15 @@ function preservarProgressoDoMotorista(rota, existente) {
     parada.status = noBanco.get(parada.id)?.status ?? 'Pendente';
   }
   return null;
+}
+
+/** Trecho de URL decodificado; um `%` malformado é erro do cliente (400), não do servidor. */
+function decodificar(trecho) {
+  try {
+    return decodeURIComponent(trecho);
+  } catch {
+    throw erroHttp(400, 'Endereço da requisição inválido.');
+  }
 }
 
 function responder(resposta, status, corpo) {
@@ -465,7 +488,7 @@ function criarServidor({
         try {
           responder(resposta, 201, repositorio.salvarMotorista(motorista));
         } catch (erro) {
-          if (erro.codigo === 'EMAIL_DUPLICADO') {
+          if (erro.codigo === 'EMAIL_DUPLICADO' || erro.codigo === 'ID_DUPLICADO') {
             responder(resposta, 409, {mensagem: erro.message});
             return;
           }
@@ -501,7 +524,7 @@ function criarServidor({
 
       if (requisicao.method === 'GET' && trajetoEncontrado) {
         const usuario = exigirUsuario(requisicao);
-        const rota = repositorio.buscarRota(decodeURIComponent(trajetoEncontrado[1]));
+        const rota = repositorio.buscarRota(decodificar(trajetoEncontrado[1]));
 
         if (!rota) {
           throw erroHttp(404, 'Rota não encontrada.');
@@ -605,7 +628,7 @@ function criarServidor({
       // NÃO é guardada nem registrada. O resultado também não vai para o cache de trajetos (depende da posição).
       if (requisicao.method === 'POST' && recalculoEncontrado) {
         const usuario = exigirUsuario(requisicao, ['motorista']);
-        const rota = repositorio.buscarRota(decodeURIComponent(recalculoEncontrado[1]));
+        const rota = repositorio.buscarRota(decodificar(recalculoEncontrado[1]));
         if (!rota) {
           throw erroHttp(404, 'Rota não encontrada.');
         }
@@ -688,8 +711,8 @@ function criarServidor({
         }
         const resultado = repositorio.registrarComprovanteEnviado({
           idEnvio: corpo.idEnvio,
-          rotaId: decodeURIComponent(comprovanteEncontrado[1]),
-          paradaId: decodeURIComponent(comprovanteEncontrado[2]),
+          rotaId: decodificar(comprovanteEncontrado[1]),
+          paradaId: decodificar(comprovanteEncontrado[2]),
           usuarioId: usuario.id,
           coletadoPor: corpo.coletadoPor,
           recebedor: corpo.recebedor.trim(),
@@ -715,7 +738,7 @@ function criarServidor({
       if (requisicao.method === 'PUT' && rotaEncontrada) {
         const usuario = exigirUsuario(requisicao);
         const rota = await lerJson(requisicao);
-        rota.id = decodeURIComponent(rotaEncontrada[1]);
+        rota.id = decodificar(rotaEncontrada[1]);
         const erroValidacao = validarRota(rota, repositorio.buscarRota(rota.id) ?? null);
 
         if (erroValidacao) {
@@ -749,6 +772,11 @@ function criarServidor({
     } catch (erro) {
       const mensagem =
         erro instanceof Error ? erro.message : 'Erro interno do servidor.';
+      // Rede de segurança: violação de unicidade que escapou das validações é conflito (409), não erro do servidor.
+      if (erro.status === undefined && mensagem.includes('UNIQUE constraint')) {
+        responder(resposta, 409, {mensagem: 'Já existe um registro com esses dados.'});
+        return;
+      }
       const status = erro.status ?? (mensagem.includes('FOREIGN KEY') ? 400 : 500);
       responder(resposta, status, {mensagem});
     }
