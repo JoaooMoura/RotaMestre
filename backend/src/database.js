@@ -62,6 +62,8 @@ const MOTORISTA_DEMO = {
 };
 
 const SQLITE_CONSTRAINT_UNIQUE = 2067;
+// Posição de uma rota pausada há mais que isso deixa de ser guardada (a frota já não a mostra durante a pausa).
+const PAUSA_LONGA_DA_POSICAO_MS = 30 * 60 * 1000;
 const SQLITE_CONSTRAINT_PRIMARYKEY = 1555;
 
 function ddlMotoristas(nomeTabela) {
@@ -440,10 +442,42 @@ function criarRepositorio(caminhoBanco, {seedDemo = false} = {}) {
     };
   }
 
+  /** Sem rota em andamento nem pausada, a última posição do motorista não serve mais a ninguém. */
+  function limparPosicaoSeSemRotaAtiva(motoristaId) {
+    banco
+      .prepare(`
+        DELETE FROM posicoes_motoristas
+        WHERE motorista_id = ?
+          AND NOT EXISTS (
+            SELECT 1 FROM rotas WHERE motorista_id = posicoes_motoristas.motorista_id AND status IN ('Em andamento', 'Pausada')
+          )
+      `)
+      .run(motoristaId);
+  }
+
+  /** Rota pausada há muito tempo: a posição guardada antes da pausa já não representa nada. */
+  function limparPosicoesDePausasLongas(agora, pausaMs = PAUSA_LONGA_DA_POSICAO_MS) {
+    banco
+      .prepare(`
+        DELETE FROM posicoes_motoristas
+        WHERE recebida_em < ? AND rota_id IN (SELECT id FROM rotas WHERE status = 'Pausada')
+      `)
+      .run(agora - pausaMs);
+  }
+
+  /** A posição some quando a rota muda de dono ou deixa de estar em andamento. */
+  function limparPosicoesDaRota(rotaId, motoristaId, status) {
+    banco.prepare('DELETE FROM posicoes_motoristas WHERE rota_id = ? AND motorista_id <> ?').run(rotaId, motoristaId);
+    if (status !== 'Em andamento' && status !== 'Pausada') {
+      banco.prepare('DELETE FROM posicoes_motoristas WHERE rota_id = ?').run(rotaId);
+    }
+  }
+
   function salvarRota(rota) {
     banco.exec('BEGIN IMMEDIATE');
 
     try {
+      const anterior = banco.prepare('SELECT motorista_id FROM rotas WHERE id = ?').get(rota.id);
       banco
         .prepare(`
           INSERT INTO rotas (id, nome, data, horario, motorista_id, status, criado_em)
@@ -508,6 +542,12 @@ function criarRepositorio(caminhoBanco, {seedDemo = false} = {}) {
           );
         }
       });
+
+      limparPosicoesDaRota(rota.id, rota.motoristaId, rota.status);
+      limparPosicaoSeSemRotaAtiva(rota.motoristaId);
+      if (anterior && anterior.motorista_id !== rota.motoristaId) {
+        limparPosicaoSeSemRotaAtiva(anterior.motorista_id);
+      }
 
       banco.exec('COMMIT');
       return buscarRotaAtualPorId(rota.id);
@@ -721,6 +761,8 @@ function criarRepositorio(caminhoBanco, {seedDemo = false} = {}) {
         .get(rotaId).n;
       if (restantes === 0) {
         banco.prepare("UPDATE rotas SET status = 'Concluída' WHERE id = ?").run(rotaId);
+        limparPosicoesDaRota(rotaId, rota.motorista_id, 'Concluída');
+        limparPosicaoSeSemRotaAtiva(rota.motorista_id);
       }
       banco
         .prepare('INSERT INTO envios_comprovante (id_envio, rota_id, parada_id, usuario_id, resultado, motivo, recebido_em) VALUES (?, ?, ?, ?, ?, NULL, ?)')
@@ -738,6 +780,7 @@ function criarRepositorio(caminhoBanco, {seedDemo = false} = {}) {
     if (retencaoMs !== undefined) {
       banco.prepare('DELETE FROM posicoes_motoristas WHERE recebida_em < ?').run(posicao.recebidaEm - retencaoMs);
     }
+    limparPosicoesDePausasLongas(posicao.recebidaEm);
     banco
       .prepare(`
         INSERT INTO posicoes_motoristas (motorista_id, rota_id, latitude, longitude, precisao_m, registrada_em, recebida_em)
@@ -771,6 +814,7 @@ function criarRepositorio(caminhoBanco, {seedDemo = false} = {}) {
    */
   function listarFrota(agora, retencaoMs) {
     banco.prepare('DELETE FROM posicoes_motoristas WHERE recebida_em < ?').run(agora - retencaoMs);
+    limparPosicoesDePausasLongas(agora);
     const frota = [];
     for (const motorista of listarMotoristas()) {
       const rota = buscarRotaAtual(motorista.id);
