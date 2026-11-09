@@ -18,6 +18,19 @@ import {
 } from '../componentes';
 import {cores, estilos} from '../estilos';
 import {cadastrarMotorista} from '../servicos/api';
+import {
+  normalizarCategoria,
+  validarAnoDoVeiculo,
+  validarCategoriaCnh,
+  validarEmail,
+  validarModelo,
+  validarNomeCompleto,
+  validarNumeroCnh,
+  validarPlaca,
+  validarSenhaDeCadastro,
+  validarTelefone,
+  validarValidadeCnh,
+} from '../validacao';
 import {formatarDataEHora} from '../offline';
 import {useSessao} from '../viewmodels/SessaoViewModel';
 
@@ -62,6 +75,17 @@ export function TelaAutenticacao({rotaBaixada, podeColetarSemEntrar, aoAbrirRota
     const temporizador = setTimeout(() => setEtapa('login'), 900);
     return () => clearTimeout(temporizador);
   }, []);
+
+  const erroEmail = validarEmail(email);
+  const erroNome = validarNomeCompleto(nome);
+  const erroTelefone = validarTelefone(telefone);
+  const erroSenhaCadastro = validarSenhaDeCadastro(senha);
+  const erroCnh = validarNumeroCnh(cnh);
+  const erroCategoria = validarCategoriaCnh(categoria);
+  const erroValidade = validarValidadeCnh(validade);
+  const erroPlaca = validarPlaca(placa);
+  const erroModelo = validarModelo(modelo);
+  const erroAno = validarAnoDoVeiculo(ano);
 
   async function continuarLogin() {
     if (await sessao.verificarCredenciais(email, senha)) {
@@ -130,9 +154,11 @@ export function TelaAutenticacao({rotaBaixada, podeColetarSemEntrar, aoAbrirRota
           keyboardType="email-address"
           autoCapitalize="none"
           autoComplete="email"
+          erro={erroEmail}
         />
         <BotaoPrincipal
           titulo="Enviar recuperação"
+          desabilitado={!!erroEmail}
           onPress={() =>
             Alert.alert(
               'Recuperação de demonstração',
@@ -195,7 +221,15 @@ export function TelaAutenticacao({rotaBaixada, podeColetarSemEntrar, aoAbrirRota
         <Text style={estilos.loginTitulo} accessibilityRole="header">
           Dados pessoais
         </Text>
-        <Campo rotulo="Nome completo" icone="account-outline" value={nome} onChangeText={setNome} />
+        <Campo
+          rotulo="Nome completo"
+          icone="account-outline"
+          value={nome}
+          onChangeText={setNome}
+          autoCapitalize="words"
+          maxLength={80}
+          erro={erroNome}
+        />
         <Campo
           rotulo="E-mail"
           icone="email-outline"
@@ -203,6 +237,7 @@ export function TelaAutenticacao({rotaBaixada, podeColetarSemEntrar, aoAbrirRota
           onChangeText={setEmail}
           autoCapitalize="none"
           keyboardType="email-address"
+          erro={erroEmail}
         />
         <Campo
           rotulo="Telefone"
@@ -211,6 +246,7 @@ export function TelaAutenticacao({rotaBaixada, podeColetarSemEntrar, aoAbrirRota
           onChangeText={setTelefone}
           keyboardType="phone-pad"
           mascara={Masks.BRL_PHONE}
+          erro={erroTelefone}
         />
         <Campo
           rotulo="Senha"
@@ -220,9 +256,12 @@ export function TelaAutenticacao({rotaBaixada, podeColetarSemEntrar, aoAbrirRota
           secureTextEntry={!senhaVisivel}
           autoCapitalize="none"
           acao={botaoVerSenha}
+          maxLength={72}
+          erro={erroSenhaCadastro}
         />
         <BotaoPrincipal
           titulo="Continuar"
+          desabilitado={!!(erroNome || erroEmail || erroTelefone || erroSenhaCadastro)}
           onPress={() => {
             if (!nome || !email || !telefone || !senha) {
               Alert.alert('Campos obrigatórios', 'Preencha todos os campos.');
@@ -252,15 +291,17 @@ export function TelaAutenticacao({rotaBaixada, podeColetarSemEntrar, aoAbrirRota
           onChangeText={setCnh}
           keyboardType="number-pad"
           mascara={[/\d/, /\d/, /\d/, /\d/, /\d/, /\d/, /\d/, /\d/, /\d/, /\d/, /\d/]}
+          erro={erroCnh}
         />
         <Campo
           rotulo="Categoria"
           icone="certificate-outline"
           value={categoria}
-          onChangeText={setCategoria}
+          onChangeText={texto => setCategoria(normalizarCategoria(texto))}
           placeholder="Ex.: B"
           autoCapitalize="characters"
           maxLength={2}
+          erro={erroCategoria}
         />
         <Campo
           rotulo="Data de validade"
@@ -270,9 +311,11 @@ export function TelaAutenticacao({rotaBaixada, podeColetarSemEntrar, aoAbrirRota
           placeholder="DD/MM/AAAA"
           mascara={Masks.DATE_DDMMYYYY}
           keyboardType="number-pad"
+          erro={erroValidade}
         />
         <BotaoPrincipal
           titulo="Continuar"
+          desabilitado={!!(erroCnh || erroCategoria || erroValidade)}
           onPress={() => {
             if (!cnh || !categoria || !validade) {
               Alert.alert('Campos obrigatórios', 'Preencha os dados da CNH.');
@@ -299,21 +342,33 @@ export function TelaAutenticacao({rotaBaixada, podeColetarSemEntrar, aoAbrirRota
           rotulo="Placa"
           icone="car-info"
           value={placa}
-          onChangeText={setPlaca}
+          onChangeText={texto => setPlaca(texto.toUpperCase())}
           autoCapitalize="characters"
           mascara={[/[a-zA-Z]/, /[a-zA-Z]/, /[a-zA-Z]/, '-', /\d/, /[a-zA-Z0-9]/, /\d/, /\d/]}
           placeholder="ABC-1A23 ou ABC-1234"
+          erro={erroPlaca}
         />
-        <Campo rotulo="Marca e modelo" icone="car-outline" value={modelo} onChangeText={setModelo} />
+        <Campo
+          rotulo="Marca e modelo"
+          icone="car-outline"
+          value={modelo}
+          onChangeText={setModelo}
+          maxLength={60}
+          erro={erroModelo}
+        />
         <Campo
           rotulo="Ano"
           icone="calendar-blank-outline"
           value={ano}
-          onChangeText={setAno}
+          onChangeText={texto => setAno(texto.replace(/\D/g, '').slice(0, 4))}
           keyboardType="number-pad"
+          maxLength={4}
+          placeholder="Ex.: 2021"
+          erro={erroAno}
         />
         <BotaoPrincipal
           titulo="Finalizar cadastro"
+          desabilitado={!!(erroPlaca || erroModelo || erroAno)}
           onPress={async () => {
             if (!placa || !modelo || !ano) {
               Alert.alert('Campos obrigatórios', 'Preencha os dados do veículo.');
@@ -322,14 +377,14 @@ export function TelaAutenticacao({rotaBaixada, podeColetarSemEntrar, aoAbrirRota
             try {
               await cadastrarMotorista({
                 id: Date.now().toString(),
-                nome,
-                email,
+                nome: nome.trim(),
+                email: email.trim(),
                 senha,
-                veiculo: `${modelo} • ${placa}`,
+                veiculo: `${modelo.trim()} • ${placa.trim().toUpperCase()}`,
                 disponivel: true,
                 telefone,
                 cnhNumero: cnh,
-                cnhCategoria: categoria,
+                cnhCategoria: categoria.trim().toUpperCase(),
                 cnhValidade: validade,
               });
               setEtapa('concluido');
@@ -391,7 +446,8 @@ export function TelaAutenticacao({rotaBaixada, podeColetarSemEntrar, aoAbrirRota
 
       <BotaoPrincipal
         titulo={sessao.verificando ? 'Entrando...' : 'Entrar'}
-        desabilitado={sessao.verificando}
+        // No login só se exige preenchimento: contas antigas podem ter e-mail fora do formato novo.
+        desabilitado={sessao.verificando || !email.trim() || !senha}
         onPress={continuarLogin}
       />
       <BotaoTexto titulo="Esqueci minha senha" onPress={() => setEtapa('recuperar')} />
